@@ -8,7 +8,7 @@ export type AgentState =
   | "waiting_input" | "blocked_permission" | "error";
 export type NodeState =
   | "pending" | "ready" | "running" | "done" | "failed"
-  | "blocked" | "needs_decision";
+  | "blocked" | "needs_decision" | "missing_role";
 export type AgentMode = "foreground" | "background";
 
 export interface Workspace {
@@ -150,7 +150,17 @@ export interface Proposal {
 // The internal bus event (§4.18). Tagged by `topic`.
 export type BusEvent =
   | { topic: "signal"; signal: string; ws: string; agent: string; [k: string]: unknown }
-  | { topic: "workflow"; event: string; graph: string; node?: string; [k: string]: unknown }
+  | {
+      topic: "workflow";
+      workspace_id: string;
+      // Inner serde object: `tag = "event"`, `rename_all = "snake_case"`
+      // (crates/supervisor-core/src/dag.rs WorkflowEvent): node_ready |
+      // node_started | node_done (+ skipped) | node_failed | node_blocked
+      // (+ reason) | node_needs_decision | missing_role (+ role) | loop_back
+      // (+ target, revision) | ack (+ ack, no node).
+      event: { event: string; graph: string; node?: string; [k: string]: unknown };
+      [k: string]: unknown;
+    }
   | { topic: "fleet"; kind: string; workspace_id?: string; agent_id?: string; [k: string]: unknown }
   | { topic: "decision"; [k: string]: unknown }
   | { topic: "inbox"; kind: string; [k: string]: unknown }
