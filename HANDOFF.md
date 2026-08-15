@@ -73,6 +73,18 @@ Follow §9 in order, `cd web && npm run test && npm run build` after each:
 - **Ledger + docs lifecycle:** one ledger row per plan; update at every transition; broadcast doc changes on the bus per `docs/agents/memory-keeper.md` (plans → `agent_bus/dev`).
 - **Review loop:** milestones go to `agent_bus/review` (post with `--from dev`), fixes from findings, re-request until APPROVE.
 
+## Roster, skills, plugins
+
+- `.opencode/` is installed: the lily agent roster (`agents/`: dev, reviewer,
+  tester, designer, memory-keeper), the bundled skills (`skills/`: rust-standards,
+  react-ts-vite-standards, impeccable, ui-skills, playwright-*, docs-standards,
+  agent-browser, webapp-testing, …), and the plugin config (`opencode.json`:
+  envsitter-guard, @plannotator/opencode). `node_modules/` is gitignored but
+  present so the plugins work immediately.
+- `docs/agents/` holds the mission docs + `install-memory-keeper.sh` (the
+  twice-daily docs sweep).
+- The mission doc is `docs/agents/dev-orchestrator.md` — read it first.
+
 ## Environment notes
 
 - Binaries: `cargo build --release` + copy `target/release/supervisor{,-daemon}` to `~/.cargo/bin/`.
