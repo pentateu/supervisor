@@ -33,7 +33,7 @@
    anywhere.
 5. Keep verification green: `cargo test --workspace`, `cargo clippy
    --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`,
-   `cd web && npm run test && npm run build`. E2E must run headless in CI
+   `cd web && bun run test && bun run build`. E2E must run headless in CI
    without a live opencode server.
 
 ## Current vs target
@@ -65,11 +65,11 @@ Landed in I-31 Phase B (B6, 2026-08-16): `web/src/pages/Intake.tsx` +
 ### 3. Playwright e2e suite
 
 - **Location + toolchain:** `web/e2e/`, `@playwright/test` added to
-  `web/package.json` (npm, matching the app — a deliberate deviation from the
-  `tester.md` Bun note). Scripts: `test:e2e`, `test:e2e:headed`,
+  `web/package.json` (bun, matching the app — the app's toolchain is bun,
+  per the `tester.md` Bun note). Scripts: `test:e2e`, `test:e2e:headed`,
   `test:e2e:report`.
 - **Harness** (`web/e2e/run-e2e.sh`): boot a scratch supervisor-daemon on
-  4198 with `open_supervisor_workspace=false`, `npm run build:install` to put
+  4198 with `open_supervisor_workspace=false`, `bun run build:install` to put
   the bundle in `~/.supervisor/ui`, then run Playwright with
   `baseURL=http://127.0.0.1:4198/ui/`. Shut the daemon down after.
 - **Auth in tests:** read `~/.supervisor/api-token` and navigate with the token
@@ -129,8 +129,9 @@ Landed in I-31 Phase B (B6, 2026-08-16): the full §5.3 panel in
 
 ## Open questions
 
-1. npm vs Bun for `web/e2e/`. Recommendation: npm, single lockfile with the
-   app; update `tester.md`'s Bun note as a separate doc change.
+1. ~~npm vs Bun for `web/e2e/`.~~ **Resolved:** Bun — the app's toolchain is
+   bun (`web/bun.lock`, 2026-08-16), so e2e uses bun for a single lockfile;
+   consistent with `tester.md`'s Bun note.
 2. Do the `@live` canvas/agent-dialog e2e tests boot a fake/scrubbed driver
    (hermetic, CI-safe) or a real `opencode serve` (slow, needs the chain
    green)? Recommendation: fake for CI; a tagged `@live` real-chain variant

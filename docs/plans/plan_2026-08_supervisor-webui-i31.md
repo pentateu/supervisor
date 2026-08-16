@@ -54,8 +54,8 @@ ratatui dashboard.
 
 - **Phase A** — A1 → A2 → A3 → A4 → A5. Gate: `cargo test --workspace` +
   clippy + fmt green, and a live CLI walk of A3–A5 (no browser).
-- **Phase B** — B1 → B2 → B3 → B4 → B5 → B6. Gate: `cd web && npm run test &&`
-  `npm run build` green + manual walk per §11.
+- **Phase B** — B1 → B2 → B3 → B4 → B5 → B6. Gate: `cd web && bun run test &&`
+  `bun run build` green + manual walk per §11.
 
 ## 2. Config
 
@@ -342,7 +342,7 @@ Phase A, in order, `cargo test --workspace` + clippy + fmt after each:
    `append_decision` record + route + `dag decide` + tests.
 5. A5 triage route + `status` section + tests. Phase A gate: live CLI walk.
 
-Phase B, in order, `cd web && npm run test && npm run build` after each:
+Phase B, in order, `cd web && bun run test && bun run build` after each:
 
 6. B1 types + reducer + tests.
 7. B2 canvas glyphs/edges/tag/idle + poll removal + tests.
@@ -377,7 +377,7 @@ additions), and the polish plan scope trim are done (2026-08-16);
   `supervisor on` twice (one cmux workspace), a timeout parked node →
   `supervisor dag decide … --action rerun` transitions it, `supervisor status`
   shows the triage section, journal lines for the ruling + transitions.
-- Phase B: `npm run test` + `npm run build` green; manual walk: Live tab shows
+- Phase B: `bun run test` + `bun run build` green; manual walk: Live tab shows
   running workspaces with agent rows (canvas only while a workflow runs);
   triage strip lists and links; workspace detail shows filter + cost chart +
   resume; agent dialog shows feed + decide banner; canvas shows glyphs +

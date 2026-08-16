@@ -72,16 +72,16 @@ supervisor-daemon (127.0.0.1:4198, bearer token)
 | Styling | **CSS modules + a small design-token file** | no heavyweight framework; state colors/animations are CSS classes |
 | Serving | **`tower-http` `ServeDir`** + SPA fallback in the daemon | one origin for UI + API; loopback |
 | Tests | **vitest + React Testing Library** (unit/component), **Playwright** (e2e) | renderer + reducer are the testable core |
-| Monorepo dir | `web/` at the workspace root | separate from the Rust crates; built by `cargo`-independent tooling (`npm`), artifacts copied to `~/.supervisor/ui` |
+| Monorepo dir | `web/` at the workspace root | separate from the Rust crates; built by `cargo`-independent tooling (`bun`), artifacts copied to `~/.supervisor/ui` |
 
 ### 2.2 Where the SPA lives and how it is served
 
 - Source: `web/` (package.json, Vite, `src/`). Built output → `web/dist`.
-- `supervisor build-web` (or a `Makefile`/npm script) copies `web/dist` into the
+- `supervisor build-web` (or a `Makefile`/bun script) copies `web/dist` into the
   supervisor state dir `~/.supervisor/ui`.
 - The daemon serves it: `GET /ui/*` → `ServeDir(~/.supervisor/ui)` with a
   fallback to `index.html` for client-side routes; `GET /` → redirect `/ui/`.
-- Dev: `npm run dev` runs Vite on 5173 with `/api` proxied to 4198; the SPA
+- Dev: `bun run dev` runs Vite on 5173 with `/api` proxied to 4198; the SPA
   reads the token the same way in dev and prod (§3).
 
 ### 2.3 Token bootstrap

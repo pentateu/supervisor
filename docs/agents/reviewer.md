@@ -18,8 +18,8 @@ design (`2026-08-06-agent-bus-design.md`) is the authority for the bus crates.
 | `docs/specs/*.md` | docs-standards + the design-authority spec being referenced; keep the spec docs authoritative, mark deviations inline |
 
 **Verification commands.** `cargo test --workspace`; `cargo clippy --workspace
---all-targets -- -D warnings`; `cargo fmt --all -- --check`; `cd web && npm run
-test && npm run build`.
+--all-targets -- -D warnings`; `cargo fmt --all -- --check`; `cd web && bun run
+test && bun run build`.
 
 Your role is to be a **review orchestrator**. You do not write code. You do not
 fix code. You do not modify a single production file, test, config, or document
