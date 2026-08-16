@@ -70,8 +70,8 @@ Follow §9 in order, `cd web && bun run test && bun run build` after each:
 - **Cleanup step when finishing a feature:** `cargo sweep --stamp && cargo sweep --file` on the main repo target, then `git worktree remove .worktrees/feature/<topic>` and `git branch -d feature/<topic>` + `git worktree prune`.
 - **Worktree start:** `git fetch origin && git worktree add .worktrees/feature/<topic> -b feature/<topic> origin/main`.
 - **Verification:** `cargo test --workspace` · `cargo clippy --workspace --all-targets -- -D warnings` · `cargo fmt --all -- --check` · `cd web && bun run test && bun run build`.
-- **Ledger + docs lifecycle:** one ledger row per plan; update at every transition; broadcast doc changes on the bus per `docs/agents/memory-keeper.md` (plans → `agent_bus/dev`).
-- **Review loop:** milestones go to `agent_bus/review` (post with `--from dev`), fixes from findings, re-request until APPROVE.
+- **Ledger + docs lifecycle:** one ledger row per plan; update at every transition; broadcast doc changes on the bus per `docs/agents/memory-keeper.md` (plans → `supervisor/dev`).
+- **Review loop:** milestones go to `supervisor/review` (post with `--from dev`), fixes from findings, re-request until APPROVE.
 
 ## Roster, skills, plugins
 
