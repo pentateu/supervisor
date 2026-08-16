@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LiveProvider, useLive } from "./store/live-store";
 import { hasToken, onTokenChange } from "./api/client";
 import { Dashboard } from "./pages/Dashboard";
+import { Workspace } from "./pages/Workspace";
 import { AgentDialog } from "./pages/Agent";
 import { Graphs } from "./pages/Graphs";
 import { Decisions } from "./pages/Decisions";
@@ -66,7 +67,7 @@ function Shell() {
       </header>
       <main>
         {route.page === "dashboard" && <Dashboard />}
-        {route.page === "workspace" && route.ws && <Dashboard ws={route.ws} />}
+        {route.page === "workspace" && route.ws && <Workspace ws={route.ws} />}
         {route.page === "agent" && route.ws && route.agent && <AgentDialog ws={route.ws} agent={route.agent} />}
         {route.page === "graphs" && <Graphs />}
         {route.page === "graph" && route.graph && <Graphs id={route.graph} />}
