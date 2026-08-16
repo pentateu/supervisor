@@ -32,6 +32,9 @@ export interface Agent {
   mode: AgentMode;
   state: AgentState;
   confidence: number;
+  // I-21: the daemon injects the per-agent inbox queue depth into the agents
+  // payload (api.rs list_agents).
+  inbox_depth: number;
 }
 
 export interface DoneWhen {
@@ -87,6 +90,28 @@ export interface NodeStateRow {
   started_at: string | null;
   finished_at: string | null;
   error: string | null;
+}
+
+/** A5: `GET /api/v1/triage` — the read-only attention aggregate. The endpoint
+ * is dumb on purpose: sorting and filtering are client-side. */
+export interface TriageAgentRow {
+  ws: string;
+  agent_id: string;
+  state: AgentState;
+  permission_id: string | null;
+}
+
+export interface TriageNodeRow {
+  ws: string;
+  graph_id: string;
+  node_id: string;
+  state: NodeState;
+  error: string | null;
+}
+
+export interface Triage {
+  agents: TriageAgentRow[];
+  nodes: TriageNodeRow[];
 }
 
 export interface UsageRow {

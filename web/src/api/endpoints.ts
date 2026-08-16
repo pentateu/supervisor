@@ -11,6 +11,7 @@ import type {
   NodeStateRow,
   Proposal,
   TranscriptMessage,
+  Triage,
   UsageRow,
   Workspace,
 } from "./types";
@@ -21,6 +22,7 @@ export const api = {
   workspaces: () => get<Workspace[]>("/api/v1/workspaces"),
   workspace: (ws: string) => get<Workspace>(`/api/v1/workspaces/${encodeURIComponent(ws)}`),
   agents: (ws: string) => get<Agent[]>(`/api/v1/workspaces/${encodeURIComponent(ws)}/agents`),
+  triage: () => get<Triage>("/api/v1/triage"),
 
   workspaceOn: (ws: string) => post<{ workspace: string; state: string }>(`/api/v1/workspaces/${encodeURIComponent(ws)}/on`),
   workspaceOff: (ws: string, graceful = true) =>

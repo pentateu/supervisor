@@ -69,6 +69,100 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .metric-value { font-size: 18px; font-weight: 700; }
 
 .ws-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+
+/* --- Dashboard tab shell (B3) --- */
+.dash-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.dash-tabs { display: flex; gap: 6px; }
+.dash-tab {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+}
+.dash-tab:hover { background: #21262d; }
+.dash-tab.active { color: var(--text); background: #21262d; border-color: var(--blue); }
+.tab-badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: #0f1117;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* --- Triage strip (B3): pinned above the workspace cards --- */
+.triage-strip {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.triage-empty { margin: 0 0 16px; }
+.triage-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 6px; color: var(--text); }
+.triage-row:hover { background: #21262d; }
+.triage-glyph { width: 20px; text-align: center; font-size: 13px; }
+.triage-label { font-weight: 600; }
+.triage-ws { margin-left: auto; }
+
+/* --- Workspace card agent rows (B3) --- */
+.ws-filter { display: flex; gap: 6px; margin: 8px 0 2px; }
+.ws-filter button {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 12px;
+}
+.ws-filter button.active { color: var(--text); background: #21262d; border-color: var(--blue); }
+.ws-agent-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.ws-agent-state { font-size: 11px; color: var(--dim); min-width: 90px; }
+.ws-agent-depth { margin-left: auto; font-size: 12px; }
+.ws-agent-action { font-size: 12px; padding: 2px 8px; }
+.ws-start { display: flex; gap: 8px; margin: 10px 0 2px; align-items: center; }
+.ws-start select { width: auto; flex: 1; }
+
+/* --- Off workspaces (B3) --- */
+.off-workspaces {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 8px 12px;
+}
+.off-workspaces summary { cursor: pointer; color: var(--dim); font-weight: 600; }
+.off-ws { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.off-ws:last-child { border-bottom: none; }
+
+/* --- Stats tab (B3) --- */
+.stats-table { width: 100%; border-collapse: collapse; margin: 6px 0 16px; }
+.stats-table th, .stats-table td { text-align: left; padding: 4px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.stats-table th { color: var(--dim); text-transform: uppercase; font-size: 11px; }
+.stats-shortcuts { display: flex; gap: 14px; margin-top: 4px; flex-wrap: wrap; }
+.time-series {
+  width: 100%;
+  height: 120px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 6px 0 16px;
+}
+.ts-bar { fill: var(--blue); }
+.ts-axis { stroke: var(--border); }
+.ts-label { fill: var(--dim); font-size: 9px; }
 .ws-card {
   background: var(--panel);
   border: 1px solid var(--border);
