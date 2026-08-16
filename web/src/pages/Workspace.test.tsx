@@ -13,7 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../test/jsdom-polyfills";
 
-import type { Agent, GraphRecord, UsageRow } from "../api/types";
+import type { Agent, GraphRecord, NodeStateRow, UsageRow } from "../api/types";
 import type { Workspace as WorkspaceRecord } from "../api/types";
 import type { LiveState } from "../store/reduce";
 import { bucketUsage, Workspace } from "./Workspace";
@@ -141,7 +141,7 @@ async function renderWorkspace(opts: {
   );
   // Flush the ResizeObserver microtask so React Flow measures + renders nodes.
   await act(async () => {});
-  return result;
+  return { ...result, client };
 }
 
 beforeEach(() => {
@@ -342,6 +342,72 @@ describe("installed-graph canvases", () => {
     expect(await screen.findByText(/idle — last run/)).toBeInTheDocument();
     expect(container.querySelector(".wf-canvas.wf-idle")).not.toBeNull();
     expect(api.graphNodes).toHaveBeenCalledWith("iot", "bug_flow");
+  });
+
+  it("keeps the REST backstop result when the first SSE event arrives mid-fetch (M1 race)", async () => {
+    // The probe's first call (bug_flow) stays pending until the test says
+    // so; every later call — the probe's second graph and the per-canvas
+    // snapshots — resolves immediately with that graph's persisted rows.
+    const PERSISTED: NodeStateRow = { graph_id: "other_flow", node_id: "fix", state: "done", attempt: 1, started_at: null, finished_at: "2026-08-16T03:41:00Z", error: null };
+    let probePending: ((rows: NodeStateRow[]) => void) | undefined;
+    api.graphNodes.mockImplementation((_ws: string, graphId: string) => {
+      if (probePending === undefined) {
+        return new Promise<NodeStateRow[]>((res) => {
+          probePending = res;
+        });
+      }
+      return Promise.resolve([{ ...PERSISTED, graph_id: graphId }]);
+    });
+    const { container, rerender, client } = await renderWorkspace({ graphs: [GRAPH_ACTIVE, GRAPH_IDLE] });
+    // Probe in flight for the first installed graph; nothing SSE-seen yet.
+    await waitFor(() => expect(api.graphNodes).toHaveBeenCalledWith("iot", "bug_flow"));
+    // The first workflow event for the workspace arrives while the probe is
+    // still pending — the OLD `enabled: sseSeen.size === 0 && ...` gate
+    // flipped false here. The test pins the settle-once contract: an
+    // in-flight probe must survive SSE activity (react-query may abort a
+    // disabled query's fetch depending on version), or the persisted
+    // other_flow rows — and its canvas — are lost with it.
+    mockLive.live = { ...mockLive.live, nodeStates: { iot: { bug_flow: { fix: "running" } } } };
+    rerender(
+      <QueryClientProvider client={client}>
+        <Workspace ws="iot" />
+      </QueryClientProvider>,
+    );
+    await act(async () => {});
+    // Resolving the probe must still surface other_flow's persisted rows —
+    // the graph that ran before the page load gets its canvas.
+    await act(async () => {
+      probePending?.([]);
+    });
+    expect(await screen.findByText(/idle — last run/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /bug_flow/ })).toBeInTheDocument();
+    expect(container.querySelectorAll(".ws-canvas")).toHaveLength(2);
+    expect(api.graphNodes).toHaveBeenCalledWith("iot", "other_flow");
+  });
+
+  it("still runs the REST backstop when SSE activity beats the graphs list (M1 race, pre-fetch)", async () => {
+    // Graphs are still loading when the first workflow event arrives — the
+    // OLD enabled gate (`sseSeen.size === 0 && installed.length > 0`) saw a
+    // non-empty seen set by the time the graphs resolved and never ran the
+    // probe, so the persisted run got no canvas.
+    let resolveGraphs: (g: GraphRecord[]) => void = () => {};
+    api.graphs.mockReturnValue(new Promise<GraphRecord[]>((res) => { resolveGraphs = res; }));
+    const { container, rerender, client } = await renderWorkspace();
+    mockLive.live = { ...mockLive.live, nodeStates: { iot: { bug_flow: { fix: "running" } } } };
+    rerender(
+      <QueryClientProvider client={client}>
+        <Workspace ws="iot" />
+      </QueryClientProvider>,
+    );
+    api.graphNodes.mockResolvedValue([
+      { graph_id: "other_flow", node_id: "fix", state: "done", attempt: 1, started_at: null, finished_at: "2026-08-16T03:41:00Z", error: null },
+    ]);
+    await act(async () => {
+      resolveGraphs([GRAPH_ACTIVE, GRAPH_IDLE]);
+    });
+    expect(await screen.findByText(/idle — last run/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /bug_flow/ })).toBeInTheDocument();
+    expect(container.querySelectorAll(".ws-canvas")).toHaveLength(2);
   });
 
   it("routes a role-resolved node click to the agent dialog", async () => {

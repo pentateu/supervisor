@@ -51,11 +51,14 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-function loopBack(ws: string, node: string, target: string): BusEvent {
+const GRAPH_A: GraphDef = { ...GRAPH, id: "a", name: "a" };
+const GRAPH_B: GraphDef = { ...GRAPH, id: "b", name: "b" };
+
+function loopBack(ws: string, node: string, target: string, graph: string = "g"): BusEvent {
   return {
     topic: "workflow",
     workspace_id: ws,
-    event: { event: "loop_back", graph: "g", node, target },
+    event: { event: "loop_back", graph, node, target },
   };
 }
 
@@ -194,5 +197,24 @@ describe("useGraphLiveStates — in-flight edge animations", () => {
     };
     const { result } = renderHook(() => useGraphLiveStates("ws1", GRAPH), { wrapper });
     expect(result.current.animatingEdges).toEqual(["a1-a2"]);
+  });
+
+  it("clears animation expiries when the hook switches to another graph (M3)", () => {
+    vi.useFakeTimers();
+    api.graphNodes.mockResolvedValue([]);
+    mockLive.live = { ...mockLive.live, lastEvents: [loopBack("ws1", "gate", "a2", "a")] };
+    const { result, rerender } = renderHook(({ g }: { g: GraphDef | null }) => useGraphLiveStates("ws1", g), {
+      initialProps: { g: GRAPH_A },
+      wrapper,
+    });
+    expect(result.current.animatingEdges).toEqual(["gate-a2"]);
+    // Switch to graph "b" in the same mounted hook — it shares the edge id
+    // "gate-a2", but must not inherit "a"'s pending expiry (M3).
+    rerender({ g: GRAPH_B });
+    expect(result.current.animatingEdges).toEqual([]);
+    // A fresh loop_back on "b" does animate its own edge.
+    mockLive.live = { ...mockLive.live, lastEvents: [...mockLive.live.lastEvents, loopBack("ws1", "gate", "a2", "b")] };
+    rerender({ g: GRAPH_B });
+    expect(result.current.animatingEdges).toEqual(["gate-a2"]);
   });
 });

@@ -105,6 +105,15 @@ export function useGraphLiveStates(ws: string | undefined, graph: GraphDef | nul
   const lastSeen = useRef<BusEvent | null>(null);
   const expiries = useRef<Map<string, number>>(new Map());
   const lastEvents = live.lastEvents;
+  // M3: a graph switch must not leak the previous graph's animation windows
+  // — expiries are edge-id-keyed, and coincident ids (e.g. `dep-node`) would
+  // animate the new canvas. Declared before the event effect so a genuine
+  // event for the NEW graph (already in the ring at switch time) still
+  // animates after the clear.
+  useEffect(() => {
+    expiries.current.clear();
+    setInFlight([]);
+  }, [graphId]);
   useEffect(() => {
     const last = lastEvents[lastEvents.length - 1] ?? null;
     if (last === lastSeen.current) return; // ring-buffer shift, not a new event

@@ -205,10 +205,16 @@ export function Workspace({ ws }: { ws: string }) {
       for (const g of installed) rows.push(...(await api.graphNodes(ws, g.id)));
       return rows;
     },
-    // I4: one-shot backstop — enabled only while the SSE ring has seen
-    // nothing for this workspace (once the reducer is authoritative it
-    // supersedes REST). No refetchInterval: the seen set only grows.
-    enabled: sseSeen.size === 0 && installed.length > 0,
+    // I4: one-shot REST backstop. M1: gating the probe on SSE activity let
+    // the first workflow event — arriving while the probe was still pending
+    // or before it had started — preempt it and drop the persisted rows, so
+    // a graph that ran before the page load got no canvas this session. The
+    // probe stays enabled until it has settled once (gated only on installed
+    // graphs); staleTime: Infinity keeps it one-shot — no refetch on focus
+    // or mount, no refetchInterval (plan §10). After it settles, SSE remains
+    // the live authority: the seen set only grows and SSE wins for state.
+    enabled: installed.length > 0,
+    staleTime: Infinity,
   });
   // seen = REST rows ∪ SSE keys; SSE wins for state, but the seen set never
   // shrinks.
