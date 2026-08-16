@@ -383,6 +383,12 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .properties label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--dim); }
 .graph-live { border: 1px solid var(--border); border-radius: 8px; height: 360px; margin-bottom: 16px; }
 .graph-list li { margin: 4px 0; }
-.decision, .proposal { border-bottom: 1px solid var(--border); padding: 6px 0; }
+.decision, .proposal, .intake-row, .rule { border-bottom: 1px solid var(--border); padding: 6px 0; }
+.note { color: var(--green); font-size: 12px; }
+.rule .on { color: var(--green); }
+.rule .off { color: var(--dim); }
+.intake-row .bug { color: var(--red); }
+.intake-row .feature { color: var(--blue); }
+.intake-row .feedback { color: var(--dim); }
 
 .missing-token { max-width: 520px; margin: 80px auto; text-align: center; }

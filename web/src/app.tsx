@@ -7,6 +7,8 @@ import { Workspace } from "./pages/Workspace";
 import { AgentDialog } from "./pages/Agent";
 import { Graphs } from "./pages/Graphs";
 import { Decisions } from "./pages/Decisions";
+import { Intake } from "./pages/Intake";
+import { Rules } from "./pages/Rules";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +22,8 @@ function parseRoute(): { page: string; ws?: string; agent?: string; graph?: stri
   if (parts[0] === "graphs" && parts[1]) return { page: "graph", graph: parts[1] };
   if (parts[0] === "graphs") return { page: "graphs" };
   if (parts[0] === "decisions") return { page: "decisions" };
+  if (parts[0] === "intake") return { page: "intake" };
+  if (parts[0] === "rules") return { page: "rules" };
   return { page: "dashboard" };
 }
 
@@ -63,6 +67,8 @@ function Shell() {
           {nav("Dashboard", "dashboard")}
           {nav("Graphs", "graphs")}
           {nav("Decisions", "decisions")}
+          {nav("Intake", "intake")}
+          {nav("Rules", "rules")}
         </nav>
       </header>
       <main>
@@ -72,6 +78,8 @@ function Shell() {
         {route.page === "graphs" && <Graphs />}
         {route.page === "graph" && route.graph && <Graphs id={route.graph} />}
         {route.page === "decisions" && <Decisions />}
+        {route.page === "intake" && <Intake />}
+        {route.page === "rules" && <Rules />}
       </main>
     </div>
   );

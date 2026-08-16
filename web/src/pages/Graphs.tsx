@@ -4,7 +4,7 @@ import { api, parseGraph } from "../api/endpoints";
 import { useGraphLiveStates } from "../lib/use-graph-live";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { validateGraph, updateNode, addNode, type GraphIssue } from "../lib/graph-edit";
-import type { GraphDef, NodeDef } from "../api/types";
+import type { GraphDef, LoopBack, NodeDef } from "../api/types";
 
 const ROLE_PALETTE = ["dev", "reviewer", "tester", "designer", "memory-keeper"];
 
@@ -34,6 +34,17 @@ function Editor({ graph }: { graph: GraphDef }) {
     if (!selected) return;
     setEdit((g) => updateNode(g, selected, p));
   };
+
+  // loop_back keeps its `on` key only while it has a value: an empty on must
+  // not serialize (`LoopBack.on` is optional on the wire, §4.11).
+  const loopBack: LoopBack = selectedNode?.loop_back ?? { small: "", big: "" };
+  const loopBackEmpty = !(loopBack.on || loopBack.small || loopBack.big);
+  const canClearLoopBack = selectedNode?.loop_back != null && loopBackEmpty;
+  const patchLoopBack = (next: LoopBack) => {
+    const { on, ...rest } = next;
+    patch({ loop_back: on ? { ...rest, on } : rest });
+  };
+  const rerunMax = typeof selectedNode?.on_error === "string" ? 1 : (selectedNode?.on_error.rerun.max ?? 1);
 
   return (
     <div className="editor">
@@ -96,6 +107,13 @@ function Editor({ graph }: { graph: GraphDef }) {
               <input value={selectedNode.role} onChange={(e) => patch({ role: e.target.value })} />
             </label>
             <label>
+              agent_id
+              <input
+                value={selectedNode.agent_id ?? ""}
+                onChange={(e) => patch({ agent_id: e.target.value === "" ? null : e.target.value })}
+              />
+            </label>
+            <label>
               start_template
               <textarea
                 value={selectedNode.start_template}
@@ -110,11 +128,98 @@ function Editor({ graph }: { graph: GraphDef }) {
               />
             </label>
             <label>
+              done_when.approved
+              <input
+                type="checkbox"
+                checked={selectedNode.done_when.approved === true}
+                onChange={(e) => patch({ done_when: { ...selectedNode.done_when, approved: e.target.checked } })}
+              />
+            </label>
+            <label>
+              done_when.match
+              <input
+                value={selectedNode.done_when.match ?? ""}
+                onChange={(e) => patch({ done_when: { ...selectedNode.done_when, match: e.target.value } })}
+              />
+            </label>
+            <label>
+              on_error
+              <select
+                value={typeof selectedNode.on_error === "string" ? selectedNode.on_error : "rerun"}
+                onChange={(e) => {
+                  const kind = e.target.value;
+                  patch(
+                    kind === "rerun"
+                      ? { on_error: { rerun: { max: rerunMax } } }
+                      : { on_error: kind as "delegate" | "skip" },
+                  );
+                }}
+              >
+                <option value="delegate">delegate</option>
+                <option value="skip">skip</option>
+                <option value="rerun">rerun</option>
+              </select>
+            </label>
+            {typeof selectedNode.on_error !== "string" && (
+              <label>
+                on_error.max
+                <input
+                  type="number"
+                  min={1}
+                  value={selectedNode.on_error.rerun.max}
+                  onChange={(e) => {
+                    const n = Math.floor(Number(e.target.value));
+                    if (Number.isFinite(n) && n >= 1) patch({ on_error: { rerun: { max: n } } });
+                  }}
+                />
+              </label>
+            )}
+            <label>
+              gate
+              <input
+                value={selectedNode.gate ?? ""}
+                onChange={(e) => patch({ gate: e.target.value === "" ? null : e.target.value })}
+              />
+            </label>
+            <label>
+              loop_back.on
+              <input
+                value={loopBack.on ?? ""}
+                onChange={(e) => patchLoopBack({ ...loopBack, on: e.target.value })}
+              />
+            </label>
+            <label>
+              loop_back.small
+              <input value={loopBack.small} onChange={(e) => patchLoopBack({ ...loopBack, small: e.target.value })} />
+            </label>
+            <label>
+              loop_back.big
+              <input value={loopBack.big} onChange={(e) => patchLoopBack({ ...loopBack, big: e.target.value })} />
+            </label>
+            {canClearLoopBack && <button onClick={() => patch({ loop_back: null })}>clear loop_back</button>}
+            <label>
               mode
               <select value={selectedNode.mode} onChange={(e) => patch({ mode: e.target.value as NodeDef["mode"] })}>
                 <option value="foreground">foreground</option>
                 <option value="background">background</option>
               </select>
+            </label>
+            <label>
+              timeout_secs
+              <input
+                type="number"
+                min={1}
+                value={selectedNode.timeout_secs ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    patch({ timeout_secs: null });
+                    return;
+                  }
+                  const n = Math.floor(Number(raw));
+                  if (Number.isFinite(n) && n >= 1) patch({ timeout_secs: n });
+                }}
+              />
             </label>
           </aside>
         )}

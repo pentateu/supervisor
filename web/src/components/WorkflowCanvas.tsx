@@ -200,7 +200,10 @@ function toFlow(
 export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const { graph, mode, nodeStates, agentStates, onNodeClick, onChange, compact, idle, lastRun, animatingEdges } = props;
   const states = nodeStates ?? EMPTY_STATES;
-  const agentStateMap = agentStates ?? {};
+  // `?? {}` created a fresh object every render, which invalidated the
+  // editSeed memo and re-ran the re-seed effect each render (pre-existing
+  // review minor, surfaced by B6 edit-mode tests).
+  const agentStateMap = agentStates ?? EMPTY_STATES;
 
   const layout = useMemo(() => (mode === "live" ? layoutGraph(graph, NODE_W, NODE_H) : undefined), [graph, mode]);
   const live = mode === "live";

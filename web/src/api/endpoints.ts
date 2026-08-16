@@ -9,9 +9,11 @@ import type {
   DecisionResponse,
   GraphDef,
   GraphRecord,
+  IntakeItem,
   Metrics,
   NodeStateRow,
   Proposal,
+  StoredRule,
   TranscriptMessage,
   Triage,
   UsageRow,
@@ -74,6 +76,11 @@ export const api = {
   previewBakeback: () => post<{ created: Proposal[]; pending: Proposal[] }>("/api/v1/bakeback/preview"),
   applyProposal: (id: string) => post(`/api/v1/bakeback/proposals/${encodeURIComponent(id)}/apply`),
   rejectProposal: (id: string) => post(`/api/v1/bakeback/proposals/${encodeURIComponent(id)}/reject`),
+
+  intake: () => get<IntakeItem[]>("/api/v1/intake"),
+  rules: () => get<StoredRule[]>("/api/v1/rules"),
+  addRule: (toml: string) => post<{ rule: string; added: boolean }>("/api/v1/rules", { toml }),
+  reloadRules: () => post<{ reloaded: boolean }>("/api/v1/rules/reload"),
 };
 
 /** Parse a stored graph JSON into a GraphDef (handles missing fields and

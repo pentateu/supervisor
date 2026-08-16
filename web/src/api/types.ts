@@ -183,6 +183,35 @@ export interface Proposal {
   resolved_at: string | null;
 }
 
+/** An ingested item (the `intake` table). */
+export interface IntakeItem {
+  id: string;
+  /** `github` | `app-feedback` | `cli`. */
+  source: "github" | "app-feedback" | "cli";
+  /** `bug` | `feature` | `feedback`. */
+  kind: "bug" | "feature" | "feedback";
+  title: string;
+  body: string;
+  severity: string | null;
+  refs: string[];
+  /** The workflow started for this item, once one is. */
+  graph_id: string | null;
+  received_at: string;
+}
+
+/** A stored rule (the `rule` table). */
+export interface StoredRule {
+  id: string;
+  /** The full `[[rule]]` TOML block. */
+  toml: string;
+  /** `data` | `code` | `bakeback`. */
+  source: "data" | "code" | "bakeback";
+  confidence: number;
+  approved: boolean;
+  active: boolean;
+  created_at: string;
+}
+
 // The internal bus event (§4.18). Tagged by `topic`.
 export type BusEvent =
   | { topic: "signal"; signal: string; ws: string; agent: string; [k: string]: unknown }
