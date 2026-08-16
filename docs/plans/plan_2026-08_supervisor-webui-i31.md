@@ -8,7 +8,7 @@
 > **System hub:** `docs/specs/2026-08-14-supervisor-webui-detailed-design.md`,
 > `docs/specs/2026-08-13-supervisor-detailed-design.md`
 >
-> Last updated: 2026-08-15.
+> Last updated: 2026-08-16.
 
 ## 0. Locked product decisions (high-level open questions, resolved)
 
@@ -278,6 +278,11 @@ No new `supervisor.toml` keys. No new CLI flags beyond `--action`/`--reason` on
   Rerun / Skip** → `POST …/nodes/{node}/decide` (I-28-style error surfacing
   on failure). Also: a matching action row in triage, and the canvas ! badge
   routes here.
+- **F1 review note (realized):** the "agent is `error`" trigger is realized
+  through the node arm — the engine's default `delegate` on_error policy
+  routes failures to `needs_decision`, and an error-only agent with no
+  `needs_decision` node renders no banner, because the decide endpoint
+  requires a graph+node (409 otherwise).
 
 ### 7.6 Absorbed surfaces (B6)
 
@@ -345,11 +350,13 @@ Phase B, in order, `cd web && npm run test && npm run build` after each:
 9. B4 workspace detail page + tests.
 10. B5 activity feed + decide banner + tests.
 11. B6 intake, rules, property panel + tests.
+12. **Phase B complete** — B1–B6 + the review-fix round landed
+    (`6fec772..422d525`); 122 vitest tests + build green.
 
-Then: update the web-UI spec (polling note → SSE; new endpoints in the API
-table; "start new agents" deferral record), the supervisor spec (§13-style
-records for the decide/triage/adopt additions), the polish plan scope trim,
-and `docs/ledger.md`.
+Then: the web-UI spec (SSE note, new endpoints, "start new agents" deferral),
+the supervisor spec (§13-style records for the decide/triage/adopt
+additions), and the polish plan scope trim are done (2026-08-16);
+`docs/ledger.md` is updated by the orchestrator at merge time.
 
 ## 10. Forbidden
 

@@ -248,9 +248,10 @@ reused.
 
 - **Metrics strip** (top): messages delivered, errors, decisions, nodes done,
   tokens, **est. cost** — for today, from `GET /api/v1/metrics`.
-- **Triage list**: every agent in `waiting_input` / `blocked_permission`, and
-  every node in `needs_decision` / `failed` / `missing_role` — clickable → agent
-  dialog / editor. Driven live by SSE.
+- **Triage list**: agent rows in `waiting_input` / `blocked_permission` /
+  `error` and node rows in `needs_decision` / `failed` / `blocked` /
+  `missing_role` from `GET /api/v1/triage`, sorted client-side by severity —
+  clickable → agent dialog / editor. Live updates ride SSE.
 - **Workspaces**: cards per workspace — state (off/on/draining/error), agent
   roster with state chips, inbox depth, active workflows.
 - **Active workflows**: for each running graph, a **mini live canvas**
@@ -259,20 +260,17 @@ reused.
 - **Decision log** (collapsed panel): recent decisions + proposals awaiting
   approval (`apply`/`reject` inline).
 - Live updates: agent state and workflow events arrive over SSE
-  (`/api/v1/events`); **node state is polled** (I-26 — the current workflow
-  events do not carry a `workspace_id`, so canvases read node states from
-  `GET /api/v1/graphs/{id}/nodes?ws=` every ~2s, workspace-scoped since I-1.
-  When workflow events gain `workspace_id`, the canvas can switch to SSE
-  attribution; until then the ~2s poll is the documented mechanism).
-- **I-31 / M-2 (folded):** §5.1's triage list (`needs_decision`/`failed`/
-  `missing_role` — clickable), §6.2's `missing_role` ⚠ glyph, §6.3's
-  `loop_back` dashed edges, and the reducer's workflow-transition handling
-  describe SSE-driven behaviors the polling deviation does not provide
-  (`missing_role` nodes hold at `ready` with no persisted marker, and the
-  `MissingRole`/`loop_back` events have no consumer). These lines are part of
-  the I-31 build-or-strike decision (detailed design in progress): either
-  persist a pollable marker (e.g. a `needs_decision` row carrying the missing
-  role) or strike the lines from the spec.
+  (`/api/v1/events`). Workflow bus events carry `workspace_id`
+  (`{"topic":"workflow","workspace_id":"…","event":{…}}`, plan A1), so the
+  reducer keys node states under `nodeStates[ws][graph][node]`. There is **no
+  node-state poll**: the initial snapshot loads once from
+  `GET /api/v1/graphs/{id}/nodes?ws=`, and the SSE reducer is the single
+  live-state authority afterwards.
+- **I-31 (folded):** §5.1's triage list, §6.2's `missing_role` ⚠ glyph, §6.3's
+  `loop_back` dashed edges, and the reducer's workflow-transition handling are
+  implemented. `missing_role` nodes persist a **surface-only marker** (the
+  engine still holds at `ready`; the next `NodeReady`/`NodeStarted` overwrites
+  it), and the `MissingRole`/`LoopBack` events drive the reducer.
 
 ### 5.2 Workspace view (`/workspaces/:ws`)
 
@@ -531,3 +529,8 @@ change the chain; it just needs it to be observable.
    it elsewhere?
 3. Do we want an in-UI graph **import/export** (paste a graph JSON) beyond the
    editor's save?
+
+**Deferred:** starting new agents into a workspace has no capability — the
+daemon has no spawn/add-agent path, so the UI only reflects the layout's
+roster (`GET /api/v1/workspaces/{ws}/agents`); adding agents stays a config
+change until a spawn capability exists.

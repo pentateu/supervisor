@@ -2,23 +2,23 @@
 
 > **Kind:** high-level plan (product + architecture intent). Not the detailed
 > software spec yet.
-> **Status:** designed (iterating). Ledger: `docs/ledger.md` →
+> **Status:** designed — scope trimmed after I-31 Phase B. Ledger: `docs/ledger.md` →
 > `plan_high_level_2026-08_webui-polish-e2e`.
-> **Sibling:** [`plan_high_level_2026-08_supervisor-webui-i31.md`](plan_high_level_2026-08_supervisor-webui-i31.md) — owns the I-31 feature set (intake/rules pages + property panel moved there, 2026-08-15).
+> **Sibling:** [`plan_high_level_2026-08_supervisor-webui-i31.md`](plan_high_level_2026-08_supervisor-webui-i31.md) — owns the I-31 feature set (intake/rules pages + property panel, landed in Phase B, 2026-08-16).
 > **Product:** the supervisor web UI in `web/` (Vite + React + TS), served by
 > `supervisor-daemon` at `http://127.0.0.1:4198/ui/`.
 > **System hub:** [`docs/specs/2026-08-14-supervisor-webui-detailed-design.md`](../specs/2026-08-14-supervisor-webui-detailed-design.md)
 > **Detail software design:** `docs/plans/plan_2026-08_webui-polish-e2e.md` (not yet written)
 >
-> Last updated: 2026-08-15.
+> Last updated: 2026-08-16.
 
 ## Requirements (locked)
 
 1. ~~Fix the live stream.~~ **Landed** — `web/src/api/sse.ts:73` sends the
    Bearer header; the fetch-stream SSE parser + abortable reconnect are in
    place (I-24/I-25 fixes). No work left here.
-2. ~~Add the two missing pages: intake and rules.~~ **Moved** to the I-31 plan
-   (`plan_high_level_2026-08_supervisor-webui-i31.md`, R10) — 2026-08-15.
+2. ~~Add the two missing pages: intake and rules.~~ **Landed** in I-31 Phase B
+   (B6) — 2026-08-16.
 3. Ship a Playwright e2e suite per the spec's test list (§7 of the web-UI
    spec): dashboard render + live SSE update, live mini-canvas animate +
    green-on-ACK, editor add/wire/edit/save/re-open, agent dialog message echo
@@ -41,10 +41,10 @@
 | Surface | Current | Target |
 |---|---|---|
 | SSE live feed | landed (`sse.ts:73` bearer header; I-24 abort, I-25 401) | nothing to do |
-| Pages | dashboard, graphs, decisions, agent dialog | intake + rules pages moved to the I-31 plan (R10) |
+| Pages | dashboard, graphs, decisions, agent dialog | intake + rules pages landed in I-31 Phase B (B6) |
 | E2E | none | Playwright suite in `web/e2e/`, seeded via the API, runs headless |
 | a11y | minimal (tablist/tab roles, three `role="alert"`; no node/control labels, no `aria-live`) | roles + labels on controls, non-color state cues, `aria-live` transcript |
-| Editor property panel | role, start_template, done_when.ack, mode only (`web/src/pages/Graphs.tsx:89-117`) | full §5.3 panel moved to the I-31 plan (R9) |
+| Editor property panel | role, start_template, done_when.ack, mode only (`web/src/pages/Graphs.tsx:89-117`) | full §5.3 panel landed in I-31 Phase B (B6) |
 | Failure states | bare `—`/empty, react-query errors unhandled | error surface per page; empty-state copy |
 
 ## Design
@@ -57,10 +57,10 @@ fetch-stream request, mirroring `web/src/api/client.ts:35-45`. No backend
 change. This is the spine of U6 — the e2e `@live` tests and the polish both
 sit on top of it. Do it first.
 
-### 2. Intake + Rules pages — moved
+### 2. Intake + Rules pages — landed
 
-Moved to the I-31 plan (`plan_high_level_2026-08_supervisor-webui-i31.md`,
-R10 + detailed design §7.6). This plan no longer builds pages.
+Landed in I-31 Phase B (B6, 2026-08-16): `web/src/pages/Intake.tsx` +
+`Rules.tsx` (I-31 detailed design §7.6). This plan no longer builds pages.
 
 ### 3. Playwright e2e suite
 
@@ -106,10 +106,10 @@ R10 + detailed design §7.6). This plan no longer builds pages.
 - Focus management for the editor property panel; `alt`/hidden on decorative
   glyphs. Asserted by the e2e `@critical` a11y checks, not just eyeballed.
 
-### 5. Editor property panel — moved
+### 5. Editor property panel — landed
 
-Moved to the I-31 plan (`plan_high_level_2026-08_supervisor-webui-i31.md`,
-R9 + detailed design §7.6).
+Landed in I-31 Phase B (B6, 2026-08-16): the full §5.3 panel in
+`web/src/pages/Graphs.tsx` (I-31 detailed design §7.6).
 
 - A small shared error/empty surface (react-query error state is currently
   unhandled across all pages) so failures render a message, not silence.
@@ -118,7 +118,7 @@ R9 + detailed design §7.6).
 
 - **In:** the remaining polish items (a11y, error/empty states) + the e2e
   harness + suite, in `web/` only. Intake/rules pages and the property panel
-  live in the I-31 plan.
+  landed in I-31 Phase B.
 - **Out:** backend changes (all endpoints needed already exist; if an e2e test
   surfaces a backend bug, that is a finding to the dev, not a test edit).
 - **Out:** the live `opencode serve` chain itself — `supervisor smoke` already
@@ -151,7 +151,7 @@ R9 + detailed design §7.6).
 
 ## Related
 
-- I-31 plan (owns intake/rules/property panel now):
+- I-31 plan (intake/rules/property panel landed in Phase B):
   [`docs/plans/plan_high_level_2026-08_supervisor-webui-i31.md`](plan_high_level_2026-08_supervisor-webui-i31.md)
 - Spec: [`docs/specs/2026-08-14-supervisor-webui-detailed-design.md`](../specs/2026-08-14-supervisor-webui-detailed-design.md) (§7 e2e list, §8 U6 milestone, §5 pages).
 - Tester contract: [`docs/agents/tester.md`](../agents/tester.md).
