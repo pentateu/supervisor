@@ -1,34 +1,21 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, parseGraph } from "../api/endpoints";
+import { useGraphLiveStates } from "../lib/use-graph-live";
 import { WorkflowCanvas } from "../components/WorkflowCanvas";
 import { validateGraph, updateNode, addNode, type GraphIssue } from "../lib/graph-edit";
 import type { GraphDef, NodeDef } from "../api/types";
 
 const ROLE_PALETTE = ["dev", "reviewer", "tester", "designer", "memory-keeper"];
 
-function useGraphNodeStates(graphId: string | undefined): Record<string, import("../api/types").NodeState> {
-  const { data } = useQuery({
-    queryKey: ["graphNodes", graphId],
-    // F-1: ws is the first arg — the graph id must go in the id position.
-    // Passing it as ws returned zero rows and the live canvas stayed blank.
-    queryFn: () => api.graphNodes(undefined, graphId ?? ""),
-    refetchInterval: 2000,
-    enabled: !!graphId,
-  });
-  return (data ?? []).reduce<Record<string, import("../api/types").NodeState>>((acc, row) => {
-    acc[row.node_id] = row.state;
-    return acc;
-  }, {});
-}
-
 function Editor({ graph }: { graph: GraphDef }) {
   const [edit, setEdit] = useState<GraphDef>(graph);
   const [selected, setSelected] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const issues: GraphIssue[] = validateGraph(edit);
-  const nodeStates = useGraphNodeStates(graph.id);
-  const running = Object.values(nodeStates).some((s) => s === "running");
+  // B2: the 2s poll is gone — SSE node states drive the "running" badge.
+  const liveStates = useGraphLiveStates(undefined, graph);
+  const running = Object.values(liveStates.states).some((s) => s === "running");
 
   const save = async () => {
     setSaveError(null);
@@ -139,9 +126,11 @@ function Editor({ graph }: { graph: GraphDef }) {
 export function Graphs({ id }: { id?: string }) {
   const { data: graphs } = useQuery({ queryKey: ["graphs"], queryFn: api.graphs, refetchInterval: 5000 });
   const selected = (graphs ?? []).find((g) => g.id === id);
-  const selectedGraph = selected ? parseGraph(selected.data) : null;
-  // Never fire `GET /graphs//nodes` when no graph is selected (review minor).
-  const liveNodes = useGraphNodeStates(id ? id : undefined);
+  const selectedGraph = useMemo(() => (selected ? parseGraph(selected.data) : null), [selected]);
+  // B2: node states load once (no ws → all workspaces), then the SSE reducer
+  // is the single state authority. Idle = no node mid-run: last-run states
+  // at low emphasis with an "idle — last run" caption.
+  const liveStates = useGraphLiveStates(undefined, selectedGraph);
 
   return (
     <div className="page">
@@ -166,7 +155,14 @@ export function Graphs({ id }: { id?: string }) {
         <>
           <h2>{id} — live</h2>
           <div className="graph-live">
-            <WorkflowCanvas graph={selectedGraph} mode="live" nodeStates={liveNodes} />
+            <WorkflowCanvas
+              graph={selectedGraph}
+              mode="live"
+              nodeStates={liveStates.states}
+              idle={liveStates.idle}
+              lastRun={liveStates.lastRun}
+              animatingEdges={liveStates.animatingEdges}
+            />
           </div>
           <h2>{id} — edit</h2>
           <Editor key={id} graph={selectedGraph} />

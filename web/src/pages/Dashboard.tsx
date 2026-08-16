@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, parseGraph } from "../api/endpoints";
 import { useLive } from "../store/live-store";
+import { useGraphLiveStates } from "../lib/use-graph-live";
 import { AgentChip, WorkflowCanvas } from "../components/WorkflowCanvas";
-import type { Agent, GraphRecord, NodeState } from "../api/types";
+import type { Agent, GraphRecord } from "../api/types";
 
 function Metric({ label, value, est }: { label: string; value: string; est?: boolean }) {
   return (
@@ -17,24 +18,13 @@ function Metric({ label, value, est }: { label: string; value: string; est?: boo
   );
 }
 
-function useGraphNodeStates(ws: string, graphId: string): Record<string, NodeState> {
-  const { data } = useQuery({
-    queryKey: ["graphNodes", ws, graphId],
-    queryFn: () => api.graphNodes(ws, graphId),
-    refetchInterval: 2000,
-  });
-  return (data ?? []).reduce<Record<string, NodeState>>((acc, row) => {
-    acc[row.node_id] = row.state;
-    return acc;
-  }, {});
-}
-
 /** A live canvas for one installed graph (hook-safe child). Full-width, one
- * per workspace at a time (the workspace card tabs between them). */
+ * per workspace at a time (the workspace card tabs between them). Node states
+ * load once over REST, then SSE bus events drive the canvas (B2 — no polls). */
 function LiveGraph({ ws, graph, agents }: { ws: string; graph: GraphRecord; agents: Agent[] }) {
   const live = useLive();
-  const nodeStates = useGraphNodeStates(ws, graph.id);
-  const parsed = parseGraph(graph.data);
+  const parsed = useMemo(() => parseGraph(graph.data), [graph.data]);
+  const { states, lastRun, idle, animatingEdges } = useGraphLiveStates(ws, parsed);
   const agentStates = agents.reduce<Record<string, import("../api/types").AgentState>>((acc, a) => {
     acc[a.agent_id] = live.agentStates[ws]?.[a.agent_id] ?? a.state;
     return acc;
@@ -47,8 +37,11 @@ function LiveGraph({ ws, graph, agents }: { ws: string; graph: GraphRecord; agen
       <WorkflowCanvas
         graph={parsed}
         mode="live"
-        nodeStates={nodeStates}
+        nodeStates={states}
         agentStates={agentStates}
+        idle={idle}
+        lastRun={lastRun}
+        animatingEdges={animatingEdges}
         onNodeClick={(n, agent) => {
           if (agent) window.location.hash = `#/workspaces/${ws}/agents/${agent}`;
           else void n;
