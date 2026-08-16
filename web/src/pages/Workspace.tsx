@@ -17,7 +17,7 @@ import { api, parseGraph } from "../api/endpoints";
 import { useLive } from "../store/live-store";
 import { useGraphLiveStates } from "../lib/use-graph-live";
 import { AgentChip, WorkflowCanvas } from "../components/WorkflowCanvas";
-import type { Agent, AgentMode, AgentState, GraphRecord, UsageRow } from "../api/types";
+import type { Agent, AgentMode, AgentState, GraphRecord, NodeStateRow, UsageRow } from "../api/types";
 
 const HOUR_MS = 3_600_000;
 const BUCKETS = 24;
@@ -188,14 +188,32 @@ export function Workspace({ ws }: { ws: string }) {
     }
   };
 
-  // §7.3: a canvas renders only while a workflow runs — only graphs the SSE
-  // reducer has seen for this ws (live.nodeStates[ws] keys) get a canvas.
-  // Seen-but-not-running renders with the `idle` + `lastRun` props; a
-  // never-run installed graph gets no canvas (the empty note below). An
-  // SSE-only id (graph deleted since its last run) can't render — only
-  // installed records carry the topology a canvas needs — and is skipped.
+  // §7.3/§7.4: a canvas renders for every installed graph the SSE reducer
+  // has seen for this ws, plus — after a fresh load, when the ring has no
+  // replay — every installed graph whose persisted node rows come back from
+  // a one-shot REST backstop (F3-style, I4). Seen-but-not-running renders
+  // with the `idle` + `lastRun` props; a never-run installed graph gets no
+  // canvas (the empty note below). An SSE-only id (graph deleted since its
+  // last run) can't render — only installed records carry the topology a
+  // canvas needs — and is skipped.
   const installed = graphs ?? [];
-  const seen = new Set(Object.keys(live.nodeStates[ws] ?? {}));
+  const sseSeen = new Set(Object.keys(live.nodeStates[ws] ?? {}));
+  const { data: restRows } = useQuery({
+    queryKey: ["wsNodeRows", ws],
+    queryFn: async () => {
+      const rows: NodeStateRow[] = [];
+      for (const g of installed) rows.push(...(await api.graphNodes(ws, g.id)));
+      return rows;
+    },
+    // I4: one-shot backstop — enabled only while the SSE ring has seen
+    // nothing for this workspace (once the reducer is authoritative it
+    // supersedes REST). No refetchInterval: the seen set only grows.
+    enabled: sseSeen.size === 0 && installed.length > 0,
+  });
+  // seen = REST rows ∪ SSE keys; SSE wins for state, but the seen set never
+  // shrinks.
+  const seen = new Set(sseSeen);
+  for (const row of restRows ?? []) seen.add(row.graph_id);
   const records = installed.filter((g) => seen.has(g.id)).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   return (

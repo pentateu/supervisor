@@ -18,6 +18,13 @@ const FEED_KINDS: Record<string, { glyph: string; label: string }> = {
   session_status: { glyph: "◉", label: "status" },
 };
 
+/** Receipt time as zero-padded "HH:MM" via getHours/getMinutes — unlike
+ * toLocaleTimeString this is locale-independent (M13). */
+function hhmm(ts: number): string {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export interface FeedTick {
   id: number;
   event: Extract<BusEvent, { topic: "signal" }>;
@@ -97,7 +104,9 @@ function useAgentDecision(ws: string, agent: string) {
   const defById = useMemo(() => new Map(defs.map((g) => [g.id, g])), [defs]);
 
   // The live authority: the first needs_decision node owned by this agent
-  // across every graph the reducer has seen for this workspace.
+  // across every graph the reducer has seen for this workspace. Ownership:
+  // an explicit node.agent_id wins; role matching is the fallback for nodes
+  // without one (C1 — same rule as resolveTriageHref and Dashboard).
   const sseDecision = useMemo<DecisionTarget | null>(() => {
     const perGraph = live.nodeStates[ws];
     if (!perGraph) return null;
@@ -106,7 +115,7 @@ function useAgentDecision(ws: string, agent: string) {
         if (nodeState !== "needs_decision") continue;
         const node = defById.get(graphId)?.nodes.find((n) => n.id === nodeId);
         if (!node) continue;
-        if (node.agent_id !== agent && node.role !== role) continue;
+        if (node.agent_id ? node.agent_id !== agent : node.role !== role) continue;
         return { graph: graphId, node: nodeId };
       }
     }
@@ -116,9 +125,13 @@ function useAgentDecision(ws: string, agent: string) {
   // Fresh-load fallback (F3): the SSE ring has no replay, so probe the REST
   // node rows of the installed graphs once — same ownership rule — until a
   // needs_decision row for this agent is found (its reason is the row's
-  // `error`).
+  // `error`). One-shot: enabled only while no SSE decision and the graphs
+  // query has loaded; no refetchInterval. The key is deliberately non-
+  // overlapping with useGraphLiveStates' ["graphNodes", id, ws ?? "all"] —
+  // a workspace id equal to a graph id would otherwise collide in the one
+  // global QueryClient (I2).
   const { data: restRows } = useQuery({
-    queryKey: ["graphNodes", ws, "all"],
+    queryKey: ["graphNodesForWs", ws],
     queryFn: async () => {
       const rows: NodeStateRow[] = [];
       for (const g of graphs ?? []) rows.push(...(await api.graphNodes(ws, g.id)));
@@ -132,7 +145,7 @@ function useAgentDecision(ws: string, agent: string) {
       if (row.state !== "needs_decision") continue;
       const node = defById.get(row.graph_id)?.nodes.find((n) => n.id === row.node_id);
       if (!node) continue;
-      if (node.agent_id !== agent && node.role !== role) continue;
+      if (node.agent_id ? node.agent_id !== agent : node.role !== role) continue;
       const target: DecisionTarget = { graph: row.graph_id, node: row.node_id };
       if (row.error) target.reason = row.error;
       return target;
@@ -300,19 +313,21 @@ export function AgentDialog({ ws, agent }: { ws: string; agent: string }) {
         <div className="agent-feed" role="log" aria-live="polite" aria-label={`${agent} activity`}>
           {shownTicks.map((t) => (
             <span key={t.id} className="feed-tick" title={new Date(t.at).toLocaleTimeString()}>
-              <span className="feed-time">{new Date(t.at).toLocaleTimeString()}</span>
+              <span className="feed-time">{hhmm(t.at)}</span>
               <span className="feed-glyph" role="img" aria-label={t.event.signal}>
                 {FEED_KINDS[t.event.signal].glyph}
               </span>
               <span className="feed-label">{FEED_KINDS[t.event.signal].label}</span>
             </span>
           ))}
-          {ticks.length > 10 && (
-            <button className="feed-more" onClick={() => setFeedExpanded((e) => !e)}>
-              {feedExpanded ? "fewer" : `+${ticks.length - 10} more`}
-            </button>
-          )}
         </div>
+      )}
+      {/* M12: the expand toggle lives outside the aria-live log — a button
+          inside a live region announces its label change on every toggle. */}
+      {ticks.length > 10 && (
+        <button className="feed-more" onClick={() => setFeedExpanded((e) => !e)}>
+          {feedExpanded ? "fewer" : `+${ticks.length - 10} more`}
+        </button>
       )}
 
       <div className="transcript">

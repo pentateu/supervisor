@@ -324,9 +324,24 @@ describe("installed-graph canvases", () => {
 
   it("shows an empty note instead of a blank page when no graph has run here", async () => {
     const { container } = await renderWorkspace({ graphs: [GRAPH_ACTIVE] });
+    // The one-shot REST backstop runs (and finds nothing) before the note is
+    // meaningful — no persisted node rows anywhere for this workspace.
+    await waitFor(() => expect(api.graphNodes).toHaveBeenCalled());
     expect(await screen.findByText(/no graph/i)).toBeInTheDocument();
     expect(container.querySelector(".ws-canvas")).toBeNull();
-    expect(api.graphNodes).not.toHaveBeenCalled();
+  });
+
+  it("renders idle canvases from REST node rows after a fresh load (no SSE replay)", async () => {
+    api.graphNodes.mockResolvedValue([
+      { graph_id: "bug_flow", node_id: "fix", state: "done", attempt: 1, started_at: null, finished_at: "2026-08-16T03:41:00Z", error: null },
+    ]);
+    const { container } = await renderWorkspace({ graphs: [GRAPH_ACTIVE] });
+    // Fresh mount: the SSE ring has seen nothing, so only the one-shot REST
+    // backstop can surface the persisted run — the canvas must render with
+    // the idle caption for the last-run state (plan §7.4).
+    expect(await screen.findByText(/idle — last run/)).toBeInTheDocument();
+    expect(container.querySelector(".wf-canvas.wf-idle")).not.toBeNull();
+    expect(api.graphNodes).toHaveBeenCalledWith("iot", "bug_flow");
   });
 
   it("routes a role-resolved node click to the agent dialog", async () => {

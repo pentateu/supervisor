@@ -63,6 +63,11 @@ const DEV: Agent = {
   confidence: 0.4,
   inbox_depth: 0,
 };
+const REV: Agent = {
+  ...DEV,
+  agent_id: "rev_01",
+  role: "reviewer",
+};
 
 const GRAPH_DATA = JSON.stringify({
   id: "bug_flow",
@@ -114,15 +119,17 @@ async function renderDialog(opts: {
   agents?: Agent[];
   graphs?: GraphRecord[];
   graphNodes?: NodeStateRow[];
+  agent?: string;
 } = {}) {
   if (opts.live) mockLive.live = opts.live;
   if (opts.agents) api.agents.mockResolvedValue(opts.agents);
   if (opts.graphs) api.graphs.mockResolvedValue(opts.graphs);
   if (opts.graphNodes) api.graphNodes.mockResolvedValue(opts.graphNodes);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const agent = opts.agent ?? "dev_01";
   const result = render(
     <QueryClientProvider client={client}>
-      <AgentDialog ws="iot" agent="dev_01" />
+      <AgentDialog ws="iot" agent={agent} />
     </QueryClientProvider>,
   );
   await act(async () => {});
@@ -169,7 +176,10 @@ describe("activity feed", () => {
       expect(within(log).getByText(label)).toBeInTheDocument();
     }
     for (const tick of [...log.querySelectorAll(".feed-tick")]) {
-      expect(tick.querySelector(".feed-time")?.textContent).toMatch(/^\d{1,2}:\d{2}/);
+      // M13: the component formats receipt times locale-independently
+      // (manual HH:MM padding), so this assertion must not depend on the
+      // runner's toLocaleTimeString output.
+      expect(tick.querySelector(".feed-time")?.textContent).toMatch(/^\d{2}:\d{2}$/);
     }
   });
 
@@ -269,12 +279,29 @@ describe("decide banner", () => {
     expect(await screen.findByText(/fix in bug_flow needs a decision/)).toBeInTheDocument();
   });
 
-  it("skips nodes owned by a different agent", async () => {
+  it("skips nodes owned by a different agent — the explicit agent_id wins over the shared role", async () => {
     const byOther = graphWith([
       { id: "fix", role: "dev", agent_id: "rev_01", depends_on: [], start_template: "fix it", done_when: { ack: "fix" }, on_error: "delegate", mode: "foreground" },
     ]);
     await renderDialog({ live: decisionLive(), graphs: [byOther] });
+    // Settlement: the fresh-load REST probe runs only after the graphs query
+    // has resolved and no SSE decision was found — under the inverted rule
+    // the banner would render (role dev matches), the probe never fires, and
+    // this wait fails. Only after it passes is the negative assertion
+    // meaningful.
+    await waitFor(() => expect(api.graphNodes).toHaveBeenCalled());
     expect(screen.queryByText(/needs a decision/)).not.toBeInTheDocument();
+  });
+
+  it("banners in the explicit agent_id owner's dialog even when the node's role is another agent's", async () => {
+    const byOther = graphWith([
+      { id: "fix", role: "dev", agent_id: "rev_01", depends_on: [], start_template: "fix it", done_when: { ack: "fix" }, on_error: "delegate", mode: "foreground" },
+    ]);
+    // The node's role is "dev" (dev_01's role) but its agent_id is rev_01:
+    // the banner must follow the agent_id. findByText waits for the graphs
+    // query to settle — the banner cannot render before the node defs load.
+    await renderDialog({ live: decisionLive(), graphs: [byOther], agent: "rev_01", agents: [DEV, REV] });
+    expect(await screen.findByText(/fix in bug_flow needs a decision/)).toBeInTheDocument();
   });
 
   it("shows the reason from the node's REST row when present", async () => {

@@ -148,6 +148,27 @@ describe("useGraphLiveStates — in-flight edge animations", () => {
     expect(result.current.animatingEdges).toEqual([]);
   });
 
+  it("clears the loop_back edge ~4s after its event even under constant unrelated traffic", async () => {
+    vi.useFakeTimers();
+    api.graphNodes.mockResolvedValue([]);
+    mockLive.live = { ...mockLive.live, lastEvents: [loopBack("ws1", "gate", "a2")] };
+    const { result, rerender } = renderHook(() => useGraphLiveStates("ws1", GRAPH), { wrapper });
+    expect(result.current.animatingEdges).toEqual(["gate-a2"]);
+    // Unrelated bus traffic keeps arriving inside the 4s window (the ring
+    // shifts on every event) — it must not cancel the pending clear, or the
+    // edge stays animated forever.
+    const unrelated: BusEvent = { topic: "signal", signal: "heartbeat", ws: "ws1", agent: "dev_01" };
+    mockLive.live = { ...mockLive.live, lastEvents: [...mockLive.live.lastEvents, unrelated] };
+    rerender();
+    await act(async () => {});
+    expect(result.current.animatingEdges).toEqual(["gate-a2"]);
+    // Past 4s the edge clears despite the traffic.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4001);
+    });
+    expect(result.current.animatingEdges).toEqual([]);
+  });
+
   it("ignores loop_back events for other graphs and workspaces", () => {
     api.graphNodes.mockResolvedValue([]);
     mockLive.live = {

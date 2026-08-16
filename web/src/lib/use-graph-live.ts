@@ -42,9 +42,12 @@ function rowsToStates(rows: Array<{ node_id: string; state: NodeState }>): Recor
  * Load a graph's node states once over REST, then overlay SSE transitions.
  *
  * `ws` is the workspace scope (`GET /graphs/{id}/nodes?ws=`). When unknown
- * (the Graphs page has no workspace in context), the SSE overlay merges
- * across all workspaces — graph ids are workspace-scoped, so this is
- * unambiguous in practice.
+ * (the Graphs page has no workspace in context), both the REST snapshot and
+ * the SSE overlay merge states across workspaces for the same graph id:
+ * node state is keyed by (ws, graph, node) and one graph can run in several
+ * workspaces, so a merged canvas is last-writer-wins and arbitrary under
+ * concurrent runs. Pre-existing limitation (the old 2s poll reduced the same
+ * way); graph definitions themselves are global.
  */
 export function useGraphLiveStates(ws: string | undefined, graph: GraphDef | null): GraphLiveStates {
   const live = useLive();
@@ -59,7 +62,9 @@ export function useGraphLiveStates(ws: string | undefined, graph: GraphDef | nul
   const rest = useMemo(() => rowsToStates(data ?? []), [data]);
 
   // The reducer's view wins over the snapshot — it saw the same state plus
-  // every transition since the page loaded.
+  // every transition since the page loaded. With no ws this merges every
+  // workspace's states for the graph id (same cross-workspace ambiguity as
+  // the REST snapshot above).
   const sse = useMemo(() => {
     if (graphId === null) return EMPTY_STATES;
     if (ws) return live.nodeStates[ws]?.[graphId] ?? EMPTY_STATES;
@@ -88,8 +93,17 @@ export function useGraphLiveStates(ws: string | undefined, graph: GraphDef | nul
 
   // Transient edge animations: react to the most recent bus event for this
   // graph/workspace, hold the edge ids for a few seconds, then clear them.
+  //
+  // I1: expiry is tracked per edge in a ref and pruned by a fixed interval,
+  // not by a per-effect setTimeout. This effect re-runs on EVERY bus event
+  // (lastEvents is a fresh array each reduce); a setTimeout scheduled by a
+  // previous run would be cancelled by the re-run's cleanup and never
+  // rescheduled when the new event is unrelated — leaving edges animated
+  // forever under traffic. Expiries survive unrelated re-runs, so an edge
+  // always clears ~ANIMATION_MS after its own event.
   const [inFlight, setInFlight] = useState<string[]>([]);
   const lastSeen = useRef<BusEvent | null>(null);
+  const expiries = useRef<Map<string, number>>(new Map());
   const lastEvents = live.lastEvents;
   useEffect(() => {
     const last = lastEvents[lastEvents.length - 1] ?? null;
@@ -109,10 +123,31 @@ export function useGraphLiveStates(ws: string | undefined, graph: GraphDef | nul
       for (const dep of deps) edges.push(`${dep}-${inner.node}`);
     }
     if (edges.length === 0) return;
-    setInFlight((prev) => [...new Set([...prev, ...edges])]);
-    const timer = setTimeout(() => setInFlight([]), ANIMATION_MS);
-    return () => clearTimeout(timer);
+    // A repeated event on an edge extends its window from the latest event.
+    const now = Date.now();
+    const map = expiries.current;
+    for (const edge of edges) map.set(edge, now + ANIMATION_MS);
+    setInFlight([...map.keys()]);
   }, [lastEvents, ws, graphId, graph?.nodes]);
+
+  // Fixed-cadence prune, independent of bus traffic: an expired edge leaves
+  // the set ~ANIMATION_MS after its event no matter what else arrives.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const map = expiries.current;
+      if (map.size === 0) return;
+      const now = Date.now();
+      let changed = false;
+      for (const [edge, expiry] of map) {
+        if (expiry <= now) {
+          map.delete(edge);
+          changed = true;
+        }
+      }
+      if (changed) setInFlight([...map.keys()]);
+    }, 250);
+    return () => clearInterval(timer);
+  }, []);
 
   return { states, lastRun, idle, animatingEdges: inFlight };
 }
