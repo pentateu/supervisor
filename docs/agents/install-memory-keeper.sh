@@ -24,7 +24,7 @@ OPENCODE_BIN="$(command -v opencode || echo "$HOME/.bun/bin/opencode")"
 fail() { echo "error: $*" >&2; exit 1; }
 
 canonical_partition() {
-  # The partition must match the project's agent-bus partition. Derive a
+  # The partition must match the project's bus partition. Derive a
   # default from the repo folder name (lowercased, non-alnum -> _) but the
   # caller should pass it explicitly when the project uses a different name.
   basename "$1" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '_'

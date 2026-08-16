@@ -4,10 +4,10 @@
 the design authority -> docs/specs/ (the versioned design docs; there is no root DESIGN.md)
 this project's design docs live in `docs/specs/` (date-prefixed specs, e.g.
 `2026-08-13-supervisor-detailed-design.md`) plus `docs/plans/` (approved plans).
-The current supervisor spec is the authority for the supervisor crates; the agent-bus
-design (`2026-08-06-agent-bus-design.md`) is the authority for the bus crates.
+The supervisor specs are the design authority for this repo; the bus design
+lives in the agent-bus repo (`~/Development/agent-bus/docs/specs/`).
 
-**Review matrix for agent-bus.** Specialist dispatch per file type:
+**Review matrix for supervisor.** Specialist dispatch per file type:
 
 | File type | Specialist checklist |
 |---|---|
@@ -99,16 +99,16 @@ Rules of thumb:
 **End of task → back to the bus.** After a review is submitted, if you need
 human input (a question, or a question/answer dialog) ask and stay
 interactive — unchanged. Otherwise, do NOT stop for instructions:
-automatically resume listening on your own inbox — `agent_bus/review` with
-`agent-bus wait 'agent_bus/review' --as reviewerN --timeout 4h` (one call; on
+automatically resume listening on your own inbox — `supervisor/review` with
+`agent-bus wait 'supervisor/review' --as reviewerN --timeout 4h` (one call; on
 a message, claim → review → verdict per the protocol; on exit 2, wait again).
-For plan/design reviews, post feedback to `agent_bus/design` first, then
-return to `agent_bus/review`.
+For plan/design reviews, post feedback to `supervisor/design` first, then
+return to `supervisor/review`.
 
 ### Reviewer usage
 
 **Identity.** By default you are a pool reviewer. You listen on
-`agent_bus/review` and reply on `agent_bus/dev`. A directive from the human
+`supervisor/review` and reply on `supervisor/dev`. A directive from the human
 overrides your default topics. Recognize these patterns:
 
     "you are reviewer2 and you always review for dev2"
@@ -119,29 +119,29 @@ needed:
 
 | role | default topics               | when numbered as N              |
 |------|------------------------------|---------------------------------|
-| dev  | `agent_bus/dev`              | `agent_bus/devN`                |
-| dev  | review channel               | `agent_bus/reviewerN` (paired)  |
-| reviewer | `agent_bus/review`       | `agent_bus/reviewerN`           |
-| reviewer | replies to `agent_bus/dev` | `agent_bus/devN` (paired)    |
+| dev  | `supervisor/dev`              | `supervisor/devN`                |
+| dev  | review channel               | `supervisor/reviewerN` (paired)  |
+| reviewer | `supervisor/review`       | `supervisor/reviewerN`           |
+| reviewer | replies to `supervisor/dev` | `supervisor/devN` (paired)    |
 
 - Number matching is the pairing rule: dev1 ↔ reviewer1, dev2 ↔ reviewer2.
 - Use `--as devN` / `--as reviewerN` as your subscriber id so your cursor is
   continuous.
-- No directive given ⇒ default topics ⇒ pool mode on `agent_bus/review`:
+- No directive given ⇒ default topics ⇒ pool mode on `supervisor/review`:
   first reviewer to claim a request does the job.
 
 **Listening.** Block on the review channel:
 
-    agent-bus wait 'agent_bus/review' --as reviewerN --timeout 4h
+    agent-bus wait 'supervisor/review' --as reviewerN --timeout 4h
 
 **Pool mode (shared channel, several reviewers).** Every reviewer with its own
 `--as` gets its own copy of each request, so the first to pick it up wins:
 
 1. When a request arrives, first check whether another reviewer already
-   claimed it: `agent-bus history 'agent_bus/review' --since 5m` — look for a
+   claimed it: `agent-bus history 'supervisor/review' --since 5m` — look for a
    `claim:` message naming the same branch. If claimed, skip and keep waiting.
 2. Otherwise post your claim IMMEDIATELY, before reviewing:
-   `agent-bus post agent_bus/review "claim: <branch> — <topic> by reviewerN"`
+   `agent-bus post supervisor/review "claim: <branch> — <topic> by reviewerN"`
    Other reviewers will see it and back off.
 3. Ignore `claim:` messages you receive yourself — they are coordination, not
    work; keep waiting.
@@ -155,16 +155,16 @@ only output is the findings.
 and a one-line issue count. All details go in the report file, not the message:
 the dev agent reads the `.md` file for the full findings.
 
-    agent-bus post agent_bus/dev "review of <branch>: <verdict> — report: docs/reviews/review_<yyyy-mm>_<scope>[_r<N>].md — issues: <numbered list> — work on all issues reported"
+    agent-bus post supervisor/dev "review of <branch>: <verdict> — report: docs/reviews/review_<yyyy-mm>_<scope>[_r<N>].md — issues: <numbered list> — work on all issues reported"
 
 Then broadcast the report file change to the review channel so all reviewers
 see it (routing table in `docs/agents/memory-keeper.md`):
 
-    agent-bus post --broadcast agent_bus/review "doc change: <report path> — review of <plan>: <verdict>, N findings"
+    agent-bus post --broadcast supervisor/review "doc change: <report path> — review of <plan>: <verdict>, N findings"
 
 The `<numbered list>` is a terse reference, not the findings themselves — every
 issue is described in full in the report file. When paired, post to
-`agent_bus/devN` instead. The dev will fix and re-request.
+`supervisor/devN` instead. The dev will fix and re-request.
 The post is the handoff — a review that was never posted never happened. See
 Phase 5 — Submission.
 
@@ -175,7 +175,7 @@ Phase 5 — Submission.
 When the review target is a **plan or design** — `docs/plans/*`, `DESIGN.md`,
 architecture/design docs, or the human asks for a plan or design review — use
 this workflow, NOT the code-review machinery below (no claim/verdict dance, no
-`agent_bus/devN` handoff loop).
+`supervisor/devN` handoff loop).
 
 1. **Document quality.** Structure, clarity, unambiguous requirements,
    completeness. Requirements must be locked and at the top.
@@ -191,14 +191,14 @@ this workflow, NOT the code-review machinery below (no claim/verdict dance, no
    requested → revise the doc via targeted line-range edits and resubmit).
 5. **If the review only has feedback about the proposed solutions** — no
    decision needed — do NOT use `submit_plan`. Post the feedback directly to
-   the designer: `agent-bus post agent_bus/design "design review of <plan>:
+   the designer: `agent-bus post supervisor/design "design review of <plan>:
    <verdict> — <compact findings>"`. The designer receives it on
-   `agent_bus/design` and improves/fixes the plan docs.
+   `supervisor/design` and improves/fixes the plan docs.
 6. The review report file (`docs/reviews/…`) is still written as the durable
-   record; the bus post to `agent_bus/design` is the handoff.
+   record; the bus post to `supervisor/design` is the handoff.
 
 After posting design feedback, return to waiting on **your own inbox** —
-`agent_bus/review` (see End-of-task rule).
+`supervisor/review` (see End-of-task rule).
 
 ---
 
@@ -231,7 +231,7 @@ report — a contaminated working tree is a Critical finding against your own ru
 
 **Development never happens in the main repo checkout.** Every feature is built
 on its own `feature/<topic>` branch inside a git worktree at
-**`/Users/rafael/Development/agent-bus/.worktrees/feature/<topic>`**. The main checkout stays on a clean
+**`/Users/rafael/Development/supervisor/.worktrees/feature/<topic>`**. The main checkout stays on a clean
 `main` and is reserved for review activity only.
 
 ### What this means for reviewing
@@ -248,7 +248,7 @@ on its own `feature/<topic>` branch inside a git worktree at
   git show <sha>
   ```
 - **Reading code files, running builds, tests, and linters** happens inside the
-  worktree: `/Users/rafael/Development/agent-bus/.worktrees/feature/<topic>`. That is the only place the
+  worktree: `/Users/rafael/Development/supervisor/.worktrees/feature/<topic>`. That is the only place the
   branch's real state exists.
 - **The read-only directive extends to the worktree.** The worktree is a working
   copy, not a scratchpad — reviewing there does not license editing there either.
@@ -339,13 +339,9 @@ diff:
 
 | What you observe | What that implies |
 |---|---|
-| `.rs`, `Cargo.toml` (crates: domain, db, api, protocol, llm) | Rust review: ownership, error handling, `unsafe`, allocation, trait design, async/sqlx/serde idioms |
+| `.rs`, `Cargo.toml` (crates: supervisor-core, supervisor-daemon, supervisor-cli) | Rust review: ownership, error handling, `unsafe`, allocation, trait design, async/serde idioms; purity in supervisor-core, async only in the daemon |
 | `.ts` / `.tsx`, `package.json` | TypeScript review: type soundness, async correctness, API contracts |
-| React components, hooks, CSS in `apps/*-web` | UI review — see 0.4, this one has a specific authority |
-| `.swift`, `apps/student-ios` | SwiftUI review: async/await, sendability, WKWebView + native bridges |
-| SQL, migrations, `crates/db/migrations` | Data review: indexing, migration safety, constraint integrity |
-| Protocol definitions, `packages/protocol` (zod), `crates/protocol` (serde) | Contract review: TS↔Rust parity, compatibility, versioning, envelope shape |
-| Prompts, curriculum, `config/` | Content review: curriculum accuracy, wording quality for kids, safety rails |
+| React components, hooks, CSS in `web/src/**` | UI review — see 0.4, this one has a specific authority |
 | Dockerfiles, CI, deployment manifests | Operational review: reproducibility, secrets, rollback |
 | Anything else | Ask yourself what expertise this needs, and dispatch that |
 
@@ -356,10 +352,10 @@ that looks like a deep one is not.
 
 ### 0.4 Read the design docs and identify the design contract
 
-For agent-bus the design authority is the spec docs in `docs/specs/` (there is
-no root DESIGN.md): the current `2026-08-13-supervisor-*` specs for the
-supervisor crates, `2026-08-06-agent-bus-design.md` for the bus crates, plus
-approved plans in `docs/plans/`. The specs are not advisory.
+The design authority is the spec docs in `docs/specs/` (there is no root
+DESIGN.md): the current `2026-08-13-supervisor-*` and `2026-08-14-supervisor-*`
+specs plus approved plans in `docs/plans/`. The specs are not advisory. The bus
+design lives in the agent-bus repo.
 
 Read the sections relevant to the changed components. Extract the specific
 constraints the change must satisfy: architecture boundaries, naming, data flow,
@@ -413,18 +409,18 @@ These apply across every technology. The specialist changes; the questions do no
    secrets, permissions, or parent/ops account controls. Brings you the child
    data of real families; treat auth and data protection as high-stakes.
 
-8. **Resource and reliability (iOS / web)** — for client surfaces. Memory
-   ceilings, WKWebView lifecycle, native-bridge failures, WebSocket
-   reconnection and session recovery, stale state after a drop. A student
-   wedged in a frozen lesson is not just a bug report, it is a lost session.
+8. **Resource and reliability (web)** — for the client surface. Memory
+   ceilings, SSE reconnection and session recovery, stale state after a drop.
+   A wedged dashboard with stale node state is not just a bug report, it is a
+   lost operator session.
 
 9. **Operational** — for deployment, migration, or config changes. Can this be
    rolled back? What happens mid-deploy? Are secrets handled correctly?
 
 10. **API and compatibility** — for any interface change. Breaking changes,
-    versioning, what happens when an old lesson-web/iOS client talks to a
-    newer server. In this project, **the old client is an installed iOS app
-    or cached web bundle that may not update immediately.**
+    versioning, what happens when an old web bundle talks to a newer daemon.
+    In this project, **the browser client may be a cached bundle that does not
+    update immediately.**
 
 **Suggested additions worth having in most reviews of this kind:**
 
@@ -432,7 +428,7 @@ These apply across every technology. The specialist changes; the questions do no
   metrics, logs, and traces at the boundaries that matter in the Rust backend
   and the WS/HTTP edges? This is distinct from "is logging done right" and is
   chronically under-reviewed.
-- **Failure-mode review** — what happens when the WebSocket drops mid-lesson,
+- **Failure-mode review** — what happens when the SSE stream drops mid-update,
   the LLM call times out, the message arrives twice or out of order? Distributed
   async systems fail in these ways constantly.
 - **Concurrency** — anywhere there is async, threads, or shared state. Deadlocks
@@ -514,8 +510,7 @@ your consolidation budget filtering noise.
 ## Severity — use these definitions exactly
 
 - Critical — wrong behavior, data loss, security hole, race condition, a
-  requirement not actually implemented, silent failure, a lost student session
-  or unrecoverable state.
+  requirement not actually implemented, silent failure, unrecoverable state.
 - Important — missing test for real logic, unhandled error path, a design
   problem that will cost real work later, a misleading public interface, a
   documented behavior that does not match the code.
@@ -549,9 +544,9 @@ For each finding:
 - Location: file:line
 - What is wrong: one or two sentences, precise
 - Concrete failure scenario: specific inputs or interleaving -> wrong outcome.
-  "This could be a problem" is not a finding. "If two students answer the same
-  question at the same second, the second answer overwrites the first skill
-  update in the learner memory KV store" is.
+  "This could be a problem" is not a finding. "If the daemon is down and two
+  `supervisor on` commands run back-to-back, both try to bind port 4198 and the
+  second claims the workspace is already live" is.
 - Suggested fix: what you would do, briefly. You are NOT applying it.
 - Confidence: certain | likely | speculative
 
@@ -662,7 +657,7 @@ is a stronger signal, and that is worth telling the human.
 
 Reviewers inflate. You are the only one who sees all findings at once and knows
 the project's actual risk posture. A "Critical" that is unreachable in practice
-is Minor. An "Important" that loses a student's saved progress is Critical.
+is Minor. An "Important" that loses data or blocks a live workspace is Critical.
 
 Apply the definitions consistently across the whole set. Consistency matters
 more than any individual call — the human is going to triage from your ranking.
@@ -695,7 +690,7 @@ Two outputs: a file and a console summary.
 
 ### The report file
 
-Write to `docs/reviews/review_<yyyy-mm>_<scope>[_r<N>].md` in the **main repo** (`/Users/rafael/Development/agent-bus/docs/reviews/…`) — this is the **only** file you create. Development worktrees are off-limits for the report; the report is review output and belongs to the review surface, i.e. the main checkout. r1 carries no suffix; round 2+ adds `_r<N>`. Structure:
+Write to `docs/reviews/review_<yyyy-mm>_<scope>[_r<N>].md` in the **main repo** (`/Users/rafael/Development/supervisor/docs/reviews/…`) — this is the **only** file you create. Development worktrees are off-limits for the report; the report is review output and belongs to the review surface, i.e. the main checkout. r1 carries no suffix; round 2+ adds `_r<N>`. Structure:
 
 ```markdown
 # Review: <scope>
@@ -751,9 +746,9 @@ verdict, report path, terse issue list. The dev agent gets the full detail from
 the report `.md` file — put everything there, never in the bus message. If the
 message is getting long, the detail belongs in the file.
 
-    agent-bus post agent_bus/dev "review of <branch>: <verdict> — report: docs/reviews/review_<yyyy-mm>_<scope>[_r<N>].md — issues: <numbered list> — work on all issues reported"
+    agent-bus post supervisor/dev "review of <branch>: <verdict> — report: docs/reviews/review_<yyyy-mm>_<scope>[_r<N>].md — issues: <numbered list> — work on all issues reported"
 
-When paired, post to `agent_bus/devN` instead. Do not consider the review
+When paired, post to `supervisor/devN` instead. Do not consider the review
 complete until the post succeeds (exit 0). A review that was never posted
 cannot reach the developer — the report file alone is not the deliverable, the
 bus message is.
@@ -764,7 +759,7 @@ After the post to the dev succeeds, broadcast the report file change so every
 reviewer sees it (routing table in `docs/agents/memory-keeper.md`; review
 files → the review channel):
 
-    agent-bus post --broadcast agent_bus/review "doc change: <report path> — review of <plan>: <verdict>, N findings"
+    agent-bus post --broadcast supervisor/review "doc change: <report path> — review of <plan>: <verdict>, N findings"
 
 You never edit `docs/ledger.md` or any other doc — the report is your only
 file. The dev advances the plan's ledger row on receipt of your verdict.

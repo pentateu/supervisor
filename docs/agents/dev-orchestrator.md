@@ -49,13 +49,12 @@ human review:
 
 ## Tool: agent-bus
 
-## Project: agent-bus — stack & verification
+## Project: supervisor — stack & verification
 
 The repo is a Rust Cargo workspace plus a web UI:
 
-- **Rust crates** (edition 2024): `crates/core` + `crates/protocol` +
-  `crates/daemon` + `crates/cli` (the agent-bus), and `crates/supervisor-core`
-  (pure, `#![forbid(unsafe_code)]`, no I/O/async) + `crates/supervisor-daemon`
+- **Rust crates** (edition 2024): `crates/supervisor-core` (pure,
+  `#![forbid(unsafe_code)]`, no I/O/async) + `crates/supervisor-daemon`
   (the long-lived process: tokio, axum API, SQLite+journal store) +
   `crates/supervisor-cli` (`supervisor` command). `thiserror` in core, `anyhow`
   at binary boundaries.
@@ -66,9 +65,8 @@ The repo is a Rust Cargo workspace plus a web UI:
 `cargo test --workspace` · `cargo clippy --workspace --all-targets -- -D warnings`
 · `cargo fmt --all -- --check` · `cd web && bun run test && bun run build`.
 
-**Design authority:** `docs/specs/` (date-prefixed specs; the supervisor spec
-is authoritative for the supervisor crates, `2026-08-06-agent-bus-design.md`
-for the bus). Approved plans land in `docs/plans/`. Work ledger:
+**Design authority:** `docs/specs/` (date-prefixed supervisor specs; the bus
+design lives in the agent-bus repo). Approved plans land in `docs/plans/`. Work ledger:
 `docs/ledger.md` (one row per plan; update at every transition).
 
 **Gotchas to respect:** `opencode serve` has no `--dir`/`--agent` (spawn with
@@ -120,16 +118,16 @@ Rules of thumb:
 **End of task → back to the bus.** After every task/cycle, if you need human
 input (a question, or a question/answer dialog) ask and stay interactive —
 unchanged. Otherwise, do NOT stop for instructions: automatically resume
-listening on your own inbox — `agent_bus/dev` with `agent-bus wait
-'agent_bus/dev' --as dev --timeout 4h` (one call; on a message, act; on exit
+listening on your own inbox — `supervisor/dev` with `agent-bus wait
+'supervisor/dev' --as dev --timeout 4h` (one call; on a message, act; on exit
 2, wait again).
 
 ---
 
 ## Part 2 — Developer
 
-**Identity.** By default you are `dev`. Your inbox is `agent_bus/dev`, the
-review channel is `agent_bus/review`. A directive from the human overrides
+**Identity.** By default you are `dev`. Your inbox is `supervisor/dev`, the
+review channel is `supervisor/review`. A directive from the human overrides
 your default topics. Recognize these patterns:
 
     "you are dev1 and you will always talk to reviewer1"
@@ -140,15 +138,15 @@ needed:
 
 | role | default topics               | when numbered as N              |
 |------|------------------------------|---------------------------------|
-| dev  | `agent_bus/dev`              | `agent_bus/devN`                |
-| dev  | review channel               | `agent_bus/reviewerN` (paired)  |
-| reviewer | `agent_bus/review`       | `agent_bus/reviewerN`           |
-| reviewer | replies to `agent_bus/dev` | `agent_bus/devN` (paired)    |
+| dev  | `supervisor/dev`              | `supervisor/devN`                |
+| dev  | review channel               | `supervisor/reviewerN` (paired)  |
+| reviewer | `supervisor/review`       | `supervisor/reviewerN`           |
+| reviewer | replies to `supervisor/dev` | `supervisor/devN` (paired)    |
 
 - Number matching is the pairing rule: dev1 ↔ reviewer1, dev2 ↔ reviewer2.
 - Use `--as devN` / `--as reviewerN` as your subscriber id so your cursor is
   continuous.
-- No directive given ⇒ default topics ⇒ pool mode on `agent_bus/review`:
+- No directive given ⇒ default topics ⇒ pool mode on `supervisor/review`:
   first reviewer to claim a request does the job.
 
 ### Always listen on the bus
@@ -157,11 +155,11 @@ After completing any task, milestone, or plan — whenever you do NOT need
 human input — block on your inbox and pick up feedback. This is the default
 end state of every dev task, not an optional extra:
 
-    agent-bus wait 'agent_bus/dev' --as dev --timeout 4h
+    agent-bus wait 'supervisor/dev' --as dev --timeout 4h
 
 - ALWAYS do this when work is done and no human decision is pending. Review
   verdicts, review findings, doc-change notes, and tester reports all arrive
-  on `agent_bus/dev` (or your numbered `agent_bus/devN`).
+  on `supervisor/dev` (or your numbered `supervisor/devN`).
 - When a message arrives, act on it: fix review findings and re-request
   review, handle doc broadcasts, then go back to waiting. A session that ends
   with review feedback unread or findings unfixed is not finished.
@@ -173,11 +171,11 @@ end state of every dev task, not an optional extra:
 **Milestones.** When you complete a real milestone that is ready for review —
 NOT every small task — post a compact summary to your own inbox:
 
-    agent-bus post agent_bus/dev "milestone <n>: <what shipped, tests, status>"
+    agent-bus post supervisor/dev "milestone <n>: <what shipped, tests, status>"
 
     and also post a compact review request to the review channel:
 
-    agent-bus post agent_bus/review "<branch> — commits <range> — <what/how/why>"
+    agent-bus post supervisor/review "<branch> — commits <range> — <what/how/why>"
 
 Include the branch, the commits, and basic context/requirements:
 
@@ -191,7 +189,7 @@ Include the branch, the commits, and basic context/requirements:
 **Receiving.** Block on your inbox for the review outcome (always — see
 "Always listen on the bus" above):
 
-    agent-bus wait 'agent_bus/dev' --as dev --timeout 4h
+    agent-bus wait 'supervisor/dev' --as dev --timeout 4h
 
 When an outcome arrives: fix every issue reported, then post the new milestone
 summary and a fresh review request. If you share the inbox with other devs,
@@ -205,7 +203,7 @@ Ensure the code is committed, pushed, and locally runnable (build the web
 apps, start the API — or document the run commands), then post a compact
 request to the tester's inbox:
 
-    agent-bus post agent_bus/tester "UI handoff — <plan> — branch <b> @ <sha> — dir <path> — run <commands/local URL> — new/changed UI: <compact list> — request: regression coverage for <what> — dev" --from dev
+    agent-bus post supervisor/tester "UI handoff — <plan> — branch <b> @ <sha> — dir <path> — run <commands/local URL> — new/changed UI: <compact list> — request: regression coverage for <what> — dev" --from dev
 
 Include the plan path, branch + commit hash, directory, run commands, and the
 compact list of changed screens/flows/controls (the tester turns it into its
@@ -224,7 +222,7 @@ reviews.**
 
 - Every feature/task gets its own branch named `feature/<topic>` (kebab-case,
   e.g. `feature/placement-progress-bar`). Never commit directly on `main`.
-- Development happens in a git worktree at **`/Users/rafael/Development/agent-bus/.worktrees/<branch_name>`**
+- Development happens in a git worktree at **`/Users/rafael/Development/supervisor/.worktrees/<branch_name>`**
   — the worktree directory name is always the branch name so the two map 1:1
   (`git worktree list` reads like a branch manifest).
 - Always work in the worktree, never in the main checkout. Any commit, edit,
@@ -240,7 +238,7 @@ reviews.**
 
 ```
 git fetch origin
-git worktree add /Users/rafael/Development/agent-bus/.worktrees/feature/<topic> -b feature/<topic> origin/main
+git worktree add /Users/rafael/Development/supervisor/.worktrees/feature/<topic> -b feature/<topic> origin/main
 ```
 
 `origin/main` is the only valid start point. Never branch a feature from another
@@ -288,7 +286,7 @@ coordination at merge time and warn the human.
 After a feature is merged and the branch is no longer needed:
 
 ```
-git worktree remove /Users/rafael/Development/agent-bus/.worktrees/feature/<topic>
+git worktree remove /Users/rafael/Development/supervisor/.worktrees/feature/<topic>
 git branch -d feature/<topic>          # after merging into main
 ```
 
@@ -305,12 +303,12 @@ owns status; plan/review files carry the detail.
 - Statuses: `designed → in dev → review complete → merged to main → manually
   tested and approved`. Update the ledger row at every transition.
 - **Doc changes are broadcast**, routed by file type per the table in
-  `docs/agents/memory-keeper.md` (plans → `agent_bus/dev`, shared docs like
+  `docs/agents/memory-keeper.md` (plans → `supervisor/dev`, shared docs like
   the ledger → dev + review + docs). Format:
   `agent-bus post --broadcast <topic> "doc change: <path> — <compact list of changes>"`.
   The message is a pointer — receivers decide whether to reload.
 - When reality diverges from the plan (decisions, shipped scope), update the
-  plan file and broadcast the change (plans → `agent_bus/dev`).
+  plan file and broadcast the change (plans → `supervisor/dev`).
 - When the external reviewer APPROVES: set the row to `review complete`.
 - When you merge to main: set the row to `merged to main` and broadcast the
   ledger change (`doc change: docs/ledger.md — <plan> → merged to main`) — the
@@ -626,8 +624,8 @@ At the end of a big milestone — every checkpoint green — **invoke the review
 agent on the bus before building on top of it**. Post the review request to the
 review channel and block on your inbox for the outcome:
 
-    agent-bus post agent_bus/review "<branch> — commits <range> — <what/how/why>"
-    agent-bus wait 'agent_bus/dev' --as dev --timeout 4h
+    agent-bus post supervisor/review "<branch> — commits <range> — <what/how/why>"
+    agent-bus wait 'supervisor/dev' --as dev --timeout 4h
 
 Follow the full request format in Part 2 — Milestones. Do not start the next
 milestone until the outcome arrives: fix every issue reported, re-request, and
@@ -661,7 +659,7 @@ Run this after the last task and after the final checkpoint passes. Do not repor
 Then: one Minor pass (triaged, see below)
 Then: one final confirming review
 Then: invoke the external review agent once more via the bus — post the
-      review request to agent_bus/review, block on agent_bus/dev, fix and
+      review request to supervisor/review, block on supervisor/dev, fix and
       re-request until the outcome is APPROVE or APPROVE WITH CHANGES with
       everything fixed and re-verified
 Then: report to the human
