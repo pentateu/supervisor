@@ -295,22 +295,25 @@ describe("bucketUsage", () => {
 });
 
 describe("installed-graph canvases", () => {
-  it("renders a canvas per installed graph, live when the reducer sees a run", async () => {
+  it("renders a canvas only for graphs the reducer has seen, live when seen running", async () => {
     mockLive.live = {
       ...mockLive.live,
       nodeStates: { iot: { bug_flow: { fix: "running" } } },
     };
     const { container } = await renderWorkspace({ graphs: [GRAPH_ACTIVE, GRAPH_IDLE] });
     expect(await screen.findByRole("link", { name: /bug_flow/ })).toBeInTheDocument();
-    expect(container.querySelectorAll(".ws-canvas")).toHaveLength(2);
-    expect(container.querySelectorAll(".wf-canvas")).toHaveLength(2);
-    // Only the graph the reducer has never seen renders idle; the run in
-    // progress renders live (and nothing has a last-run caption).
-    expect(container.querySelectorAll(".wf-canvas.wf-idle")).toHaveLength(1);
+    // The never-seen installed graph gets no canvas; the seen run renders
+    // live (no idle caption for a run in progress).
+    expect(container.querySelectorAll(".ws-canvas")).toHaveLength(1);
+    expect(container.querySelectorAll(".wf-canvas.wf-idle")).toHaveLength(0);
     expect(container.querySelectorAll(".wf-idle-caption")).toHaveLength(0);
   });
 
-  it("shows the idle caption with the last-run time for a finished graph", async () => {
+  it("shows the idle caption with the last-run time for a seen-but-finished graph", async () => {
+    mockLive.live = {
+      ...mockLive.live,
+      nodeStates: { iot: { bug_flow: { fix: "done" } } },
+    };
     api.graphNodes.mockResolvedValue([
       { graph_id: "bug_flow", node_id: "fix", state: "done", attempt: 1, started_at: null, finished_at: "2026-08-16T03:41:00Z", error: null },
     ]);
@@ -320,9 +323,20 @@ describe("installed-graph canvases", () => {
   });
 
   it("shows an empty note instead of a blank page when no graph has run here", async () => {
-    const { container } = await renderWorkspace();
+    const { container } = await renderWorkspace({ graphs: [GRAPH_ACTIVE] });
     expect(await screen.findByText(/no graph/i)).toBeInTheDocument();
     expect(container.querySelector(".ws-canvas")).toBeNull();
     expect(api.graphNodes).not.toHaveBeenCalled();
+  });
+
+  it("routes a role-resolved node click to the agent dialog", async () => {
+    mockLive.live = {
+      ...mockLive.live,
+      nodeStates: { iot: { bug_flow: { fix: "running" } } },
+    };
+    const { container } = await renderWorkspace({ graphs: [GRAPH_ACTIVE], agents: [DEV] });
+    await screen.findByRole("link", { name: /bug_flow/ });
+    fireEvent.click(container.querySelector('[data-id="fix"]')!);
+    expect(window.location.hash).toBe("#/workspaces/iot/agents/dev_01");
   });
 });

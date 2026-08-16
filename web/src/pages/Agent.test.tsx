@@ -249,6 +249,18 @@ describe("decide banner", () => {
     expect(screen.queryByText(/needs a decision/)).not.toBeInTheDocument();
   });
 
+  it("surfaces a persisted needs_decision from REST rows after a fresh load", async () => {
+    await renderDialog({
+      live: newLive(),
+      graphNodes: [
+        { graph_id: "bug_flow", node_id: "fix", state: "needs_decision", attempt: 1, started_at: null, finished_at: null, error: "stale failure" },
+      ],
+    });
+    expect(await screen.findByText(/fix in bug_flow needs a decision — stale failure/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(api.decide).toHaveBeenCalledWith("iot", "bug_flow", "fix", "done"));
+  });
+
   it("resolves ownership by role when the node has no agent_id", async () => {
     const byRole = graphWith([
       { id: "fix", role: "dev", depends_on: [], start_template: "fix it", done_when: { ack: "fix" }, on_error: "delegate", mode: "foreground" },

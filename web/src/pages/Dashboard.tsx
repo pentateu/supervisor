@@ -37,10 +37,15 @@ function LiveGraph({ ws, graph, agents }: { ws: string; graph: GraphRecord; agen
   const live = useLive();
   const parsed = useMemo(() => parseGraph(graph.data), [graph.data]);
   const { states, lastRun, idle, animatingEdges } = useGraphLiveStates(ws, parsed);
-  const agentStates = agents.reduce<Record<string, AgentState>>((acc, a) => {
-    acc[a.agent_id] = live.agentStates[ws]?.[a.agent_id] ?? a.state;
-    return acc;
-  }, {});
+  // Stable identity over (agents, live.agentStates) so the canvas's node/edge
+  // derivation memo doesn't re-run on every SSE event (M1).
+  const agentStates = useMemo(() => {
+    const perWs = live.agentStates[ws];
+    return agents.reduce<Record<string, AgentState>>((acc, a) => {
+      acc[a.agent_id] = perWs?.[a.agent_id] ?? a.state;
+      return acc;
+    }, {});
+  }, [agents, live.agentStates, ws]);
   return (
     <div className="ws-canvas">
       <a className="canvas-title" href={`#/graphs/${graph.id}`}>
@@ -55,8 +60,10 @@ function LiveGraph({ ws, graph, agents }: { ws: string; graph: GraphRecord; agen
         lastRun={lastRun}
         animatingEdges={animatingEdges}
         onNodeClick={(n, agent) => {
-          if (agent) window.location.hash = `#/workspaces/${ws}/agents/${agent}`;
-          else void n;
+          // M5: the canvas passes only the explicit agent_id; role-resolved
+          // nodes (the common case) resolve here against the fetched agents.
+          const aid = agent ?? agents.find((a) => a.role === n.role)?.agent_id;
+          if (aid) window.location.hash = `#/workspaces/${ws}/agents/${aid}`;
         }}
       />
     </div>
@@ -104,8 +111,10 @@ function rowLabel(r: TriageRow): string {
 /** The triage strip's data: the one-time REST snapshot overlaid with SSE
  * state. The reducer is the authority for everything it has seen — a state
  * that recovered drops its row, a new attention state appears, and rows for
- * workspaces known to be off are dropped. No polling (plan §10). */
-export function buildTriage(rest: Triage, live: LiveState): TriageRow[] {
+ * workspaces known to be off are dropped. The REST workspaces query is the
+ * fallback for workspace state before the first workspace_state event (M3).
+ * No polling (plan §10). */
+export function buildTriage(rest: Triage, live: LiveState, workspaces: Workspace[] = []): TriageRow[] {
   const rows = new Map<string, TriageRow>();
   for (const a of rest.agents) {
     if (TRIAGE_AGENT_STATES.has(a.state)) {
@@ -121,7 +130,16 @@ export function buildTriage(rest: Triage, live: LiveState): TriageRow[] {
     for (const [agentId, state] of Object.entries(perAgent)) {
       const key = `agent/${ws}/${agentId}`;
       if (TRIAGE_AGENT_STATES.has(state)) {
-        rows.set(key, { kind: "agent", ws, agent_id: agentId, state, permission_id: null });
+        // M2: the overlay re-keys the REST row in place — keep its
+        // permission_id so the row still carries the ruling target.
+        const prev = rows.get(key);
+        rows.set(key, {
+          kind: "agent",
+          ws,
+          agent_id: agentId,
+          state,
+          permission_id: prev?.kind === "agent" ? prev.permission_id : null,
+        });
       } else {
         rows.delete(key);
       }
@@ -139,7 +157,10 @@ export function buildTriage(rest: Triage, live: LiveState): TriageRow[] {
       }
     }
   }
-  const result = [...rows.values()].filter((r) => live.workspaceStates[r.ws] !== "off");
+  const wsState = new Map(workspaces.map((w) => [w.id, w.state]));
+  const result = [...rows.values()].filter(
+    (r) => (live.workspaceStates[r.ws] ?? wsState.get(r.ws)) !== "off",
+  );
   result.sort((a, b) => {
     const bySeverity = (TRIAGE_SEVERITY[a.state] ?? 99) - (TRIAGE_SEVERITY[b.state] ?? 99);
     if (bySeverity !== 0) return bySeverity;
@@ -232,9 +253,14 @@ function WorkspaceCard({ ws, restState }: { ws: string; restState: WorkspaceStat
   const { data: graphs } = useQuery({ queryKey: ["graphs"], queryFn: api.graphs });
   const agentList = agents ?? [];
   const installed = graphs ?? [];
-  // One process at a time: tabs when several are active, defaulting to the
-  // first. If the selected graph vanishes, fall back to the first active one.
-  const running = installed.filter((g) => g.active);
+  // §7.3: a canvas renders only while a workflow runs — only graphs the SSE
+  // reducer has seen this session (live.nodeStates[ws] keys) get one; a
+  // seen-but-idle graph renders with the `idle`/`lastRun` props, a never-run
+  // graph never does. Tabs when several seen graphs are active, defaulting to
+  // the first; if the selected graph vanishes, fall back to the first.
+  const activeInstalled = installed.filter((g) => g.active);
+  const seen = new Set(Object.keys(live.nodeStates[ws] ?? {}));
+  const running = activeInstalled.filter((g) => seen.has(g.id));
   const current = running.find((g) => g.id === activeGraph) ?? running[0];
   // The SSE workspace state wins over the REST snapshot (the reducer is the
   // authority); the snapshot is only the boot-time fallback.
@@ -349,10 +375,11 @@ function WorkspaceCard({ ws, restState }: { ws: string; restState: WorkspaceStat
           ))}
         </div>
       )}
-      {/* The canvas lives only while the workspace runs (plan §7.3); the
-          hook's `idle` is for last-run emphasis, not for hiding. */}
+      {/* §7.3: the canvas lives only while the workspace runs and the reducer
+          has seen the graph; `idle` is for last-run emphasis, not hiding. */}
       {state !== "off" && current && <LiveGraph key={current.id} ws={ws} graph={current} agents={agentList} />}
-      {running.length === 0 && <p className="dim">no active graphs</p>}
+      {activeInstalled.length === 0 && <p className="dim">no active graphs</p>}
+      {activeInstalled.length > 0 && running.length === 0 && <p className="dim">no workflow has run here yet</p>}
 
       <div className="ws-start">
         <select
@@ -529,7 +556,10 @@ export function Dashboard({ ws }: { ws?: string }) {
     refetchInterval: 3000,
   });
   // The badge on the Live tab is the current triage row count (plan §7.3).
-  const rows = useMemo(() => buildTriage(triage ?? { agents: [], nodes: [] }, live), [triage, live]);
+  const rows = useMemo(
+    () => buildTriage(triage ?? { agents: [], nodes: [] }, live, workspaces ?? []),
+    [triage, live, workspaces],
+  );
 
   const resume = async () => {
     setResumeError(null);

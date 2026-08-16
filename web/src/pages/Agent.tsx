@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, parseGraph } from "../api/endpoints";
 import { useClearPermission, useLive } from "../store/live-store";
-import type { BusEvent, DecisionAction, TranscriptMessage } from "../api/types";
+import type { BusEvent, DecisionAction, NodeStateRow, TranscriptMessage } from "../api/types";
 
 /** §5.4 feed kinds: glyph + short label per signal. `session_idle` and
  * `heartbeat` are deliberately excluded — no activity to show. */
@@ -80,9 +80,11 @@ interface DecisionTarget {
 
 /** The human's ruling target: the first `needs_decision` node owned by this
  * agent — node.agent_id, else node.role === the agent's role (the REST meta,
- * falling back to the agent id) — across every graph the reducer has seen for
- * this workspace. Graph defs load over REST for ownership only; the live
- * `nodeStates` stay the state authority (no polling). */
+ * falling back to the agent id). The live view is the first authority (every
+ * graph the reducer has seen for this workspace); the REST node rows of the
+ * installed graphs backstop it after a fresh load, because the SSE ring has
+ * no replay and a persisted needs_decision would otherwise never surface.
+ * Graph defs load over REST for ownership only (no polling). */
 function useAgentDecision(ws: string, agent: string) {
   const live = useLive();
   const { data: agents } = useQuery({ queryKey: ["agents", ws], queryFn: () => api.agents(ws) });
@@ -91,21 +93,54 @@ function useAgentDecision(ws: string, agent: string) {
   const role = meta?.role ?? agent;
   const state = live.agentStates[ws]?.[agent] ?? meta?.state ?? "unknown";
 
-  const decision = useMemo<DecisionTarget | null>(() => {
+  const defs = useMemo(() => (graphs ?? []).map((g) => parseGraph(g.data)), [graphs]);
+  const defById = useMemo(() => new Map(defs.map((g) => [g.id, g])), [defs]);
+
+  // The live authority: the first needs_decision node owned by this agent
+  // across every graph the reducer has seen for this workspace.
+  const sseDecision = useMemo<DecisionTarget | null>(() => {
     const perGraph = live.nodeStates[ws];
     if (!perGraph) return null;
-    const defs = (graphs ?? []).map((g) => parseGraph(g.data));
     for (const [graphId, perNode] of Object.entries(perGraph)) {
       for (const [nodeId, nodeState] of Object.entries(perNode)) {
         if (nodeState !== "needs_decision") continue;
-        const node = defs.find((g) => g.id === graphId)?.nodes.find((n) => n.id === nodeId);
+        const node = defById.get(graphId)?.nodes.find((n) => n.id === nodeId);
         if (!node) continue;
         if (node.agent_id !== agent && node.role !== role) continue;
         return { graph: graphId, node: nodeId };
       }
     }
     return null;
-  }, [live.nodeStates, ws, graphs, agent, role]);
+  }, [live.nodeStates, ws, defById, agent, role]);
+
+  // Fresh-load fallback (F3): the SSE ring has no replay, so probe the REST
+  // node rows of the installed graphs once — same ownership rule — until a
+  // needs_decision row for this agent is found (its reason is the row's
+  // `error`).
+  const { data: restRows } = useQuery({
+    queryKey: ["graphNodes", ws, "all"],
+    queryFn: async () => {
+      const rows: NodeStateRow[] = [];
+      for (const g of graphs ?? []) rows.push(...(await api.graphNodes(ws, g.id)));
+      return rows;
+    },
+    enabled: sseDecision === null && (graphs ?? []).length > 0,
+  });
+  const restDecision = useMemo<DecisionTarget | null>(() => {
+    if (sseDecision !== null) return null;
+    for (const row of restRows ?? []) {
+      if (row.state !== "needs_decision") continue;
+      const node = defById.get(row.graph_id)?.nodes.find((n) => n.id === row.node_id);
+      if (!node) continue;
+      if (node.agent_id !== agent && node.role !== role) continue;
+      const target: DecisionTarget = { graph: row.graph_id, node: row.node_id };
+      if (row.error) target.reason = row.error;
+      return target;
+    }
+    return null;
+  }, [sseDecision, restRows, defById, agent, role]);
+
+  const decision = sseDecision ?? restDecision;
 
   const { data: nodeRows } = useQuery({
     queryKey: ["graphNodes", decision?.graph, ws],
@@ -114,8 +149,10 @@ function useAgentDecision(ws: string, agent: string) {
   });
 
   const reason = useMemo(() => {
-    const row = (nodeRows ?? []).find((r) => r.node_id === decision?.node);
+    if (!decision) return undefined;
+    const row = (nodeRows ?? []).find((r) => r.node_id === decision.node);
     if (row?.error) return row.error;
+    if (decision.reason) return decision.reason;
     // Fall back to the agent's last failed step/session error (the wire
     // carries `error` only on step_failed).
     for (let i = live.lastEvents.length - 1; i >= 0; i--) {

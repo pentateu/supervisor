@@ -119,10 +119,15 @@ function GraphCanvas({ ws, graph, agents }: { ws: string; graph: GraphRecord; ag
   const live = useLive();
   const parsed = useMemo(() => parseGraph(graph.data), [graph.data]);
   const { states, lastRun, idle, animatingEdges } = useGraphLiveStates(ws, parsed);
-  const agentStates = agents.reduce<Record<string, AgentState>>((acc, a) => {
-    acc[a.agent_id] = live.agentStates[ws]?.[a.agent_id] ?? a.state;
-    return acc;
-  }, {});
+  // Stable identity over (agents, live.agentStates) so the canvas's node/edge
+  // derivation memo doesn't re-run on every SSE event (M1).
+  const agentStates = useMemo(() => {
+    const perWs = live.agentStates[ws];
+    return agents.reduce<Record<string, AgentState>>((acc, a) => {
+      acc[a.agent_id] = perWs?.[a.agent_id] ?? a.state;
+      return acc;
+    }, {});
+  }, [agents, live.agentStates, ws]);
   return (
     <div className="ws-canvas">
       <a className="canvas-title" href={`#/graphs/${graph.id}`}>
@@ -137,8 +142,10 @@ function GraphCanvas({ ws, graph, agents }: { ws: string; graph: GraphRecord; ag
         lastRun={lastRun}
         animatingEdges={animatingEdges}
         onNodeClick={(n, agent) => {
-          if (agent) window.location.hash = `#/workspaces/${ws}/agents/${agent}`;
-          else void n;
+          // M5: the canvas passes only the explicit agent_id; role-resolved
+          // nodes (the common case) resolve here against the fetched agents.
+          const aid = agent ?? agents.find((a) => a.role === n.role)?.agent_id;
+          if (aid) window.location.hash = `#/workspaces/${ws}/agents/${aid}`;
         }}
       />
     </div>
@@ -181,19 +188,15 @@ export function Workspace({ ws }: { ws: string }) {
     }
   };
 
-  // The graphs that run in this workspace: ids the reducer has seen for this
-  // ws (live.nodeStates[ws] keys) merged with the installed-graph REST
-  // snapshot. Only installed records carry the topology a canvas needs, so an
-  // SSE-only id (graph deleted since its last run) can't render and is
-  // skipped. The B2 hook overlays the SSE states per graph — running graphs
-  // render live, completed ones with the `idle` + `lastRun` props.
+  // §7.3: a canvas renders only while a workflow runs — only graphs the SSE
+  // reducer has seen for this ws (live.nodeStates[ws] keys) get a canvas.
+  // Seen-but-not-running renders with the `idle` + `lastRun` props; a
+  // never-run installed graph gets no canvas (the empty note below). An
+  // SSE-only id (graph deleted since its last run) can't render — only
+  // installed records carry the topology a canvas needs — and is skipped.
   const installed = graphs ?? [];
-  const seen = Object.keys(live.nodeStates[ws] ?? {});
-  const ids = new Set<string>(installed.map((g) => g.id));
-  for (const id of seen) ids.add(id);
-  const records = installed
-    .filter((g) => ids.has(g.id))
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const seen = new Set(Object.keys(live.nodeStates[ws] ?? {}));
+  const records = installed.filter((g) => seen.has(g.id)).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   return (
     <div className="page">

@@ -16,7 +16,7 @@ import "../test/jsdom-polyfills";
 
 import type { Agent, GraphRecord, Metrics, Triage, Workspace } from "../api/types";
 import type { LiveState } from "../store/reduce";
-import { Dashboard } from "./Dashboard";
+import { buildTriage, Dashboard } from "./Dashboard";
 
 const { api } = vi.hoisted(() => ({
   api: {
@@ -310,6 +310,29 @@ describe("triage strip", () => {
     });
     expect(await screen.findByText("nothing needs attention")).toBeInTheDocument();
   });
+
+  it("keeps the REST permission_id when the SSE overlay re-keys an agent row", () => {
+    const rows = buildTriage(
+      {
+        agents: [{ ws: "iot", agent_id: "dev_01", state: "blocked_permission", permission_id: "p9" }],
+        nodes: [],
+      },
+      { ...mockLive.live, agentStates: { iot: { dev_01: "blocked_permission" } } },
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: "agent", agent_id: "dev_01", permission_id: "p9" });
+  });
+
+  it("drops REST rows for workspaces that are off per the REST workspaces query on a fresh mount", async () => {
+    await renderDashboard({
+      workspaces: [WS_OFF],
+      triage: {
+        agents: [{ ws: "ledger", agent_id: "dev_01", state: "waiting_input", permission_id: null }],
+        nodes: [],
+      },
+    });
+    expect(await screen.findByText("nothing needs attention")).toBeInTheDocument();
+  });
 });
 
 describe("workspace cards", () => {
@@ -350,12 +373,22 @@ describe("workspace cards", () => {
     await waitFor(() => expect(api.attachAgent).toHaveBeenCalledWith("iot", "dev_01"));
   });
 
-  it("renders the live canvas only while a workflow runs", async () => {
+  it("renders no canvas for an active graph the reducer has never seen", async () => {
+    const { container } = await renderDashboard({ workspaces: [WS_ON], graphs: [GRAPH_ACTIVE] });
+    expect(await screen.findByText(/no workflow has run here yet/)).toBeInTheDocument();
+    expect(container.querySelector(".ws-canvas")).toBeNull();
+  });
+
+  it("renders the live canvas once the reducer has seen the graph run", async () => {
+    mockLive.live = {
+      ...mockLive.live,
+      nodeStates: { iot: { bug_flow: { fix: "running" } } },
+    };
     const { container } = await renderDashboard({ workspaces: [WS_ON], graphs: [GRAPH_ACTIVE] });
     expect(await screen.findByRole("link", { name: /bug_flow/ })).toBeInTheDocument();
     await act(async () => {});
     expect(container.querySelector(".ws-canvas .wf-node")).not.toBeNull();
-    expect(screen.queryByText("no active graphs")).not.toBeInTheDocument();
+    expect(screen.queryByText(/no workflow has run here yet/)).not.toBeInTheDocument();
   });
 
   it("hides the canvas and says so when no workflow runs", async () => {
