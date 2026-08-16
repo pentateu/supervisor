@@ -1,13 +1,15 @@
 // The pure live-state reducer (§6.4): `BusEvent[]` → `LiveState`. Unit-tested;
 // drives the dashboard and every WorkflowCanvas. No network, no React.
 
-import type { AgentState, BusEvent, WorkspaceState } from "../api/types";
+import type { AgentState, BusEvent, NodeState, WorkspaceState } from "../api/types";
 
 export interface LiveState {
   workspaceStates: Record<string, WorkspaceState>;
   agentStates: Record<string, Record<string, AgentState>>;
   /** ws → agent → pending permission id (or null). */
   permissionPending: Record<string, Record<string, string | null>>;
+  /** ws → graph → node → live node state, folded from workflow bus events. */
+  nodeStates: Record<string, Record<string, Record<string, NodeState>>>;
   lastEvents: BusEvent[];
 }
 
@@ -16,6 +18,7 @@ export function initialLiveState(): LiveState {
     workspaceStates: {},
     agentStates: {},
     permissionPending: {},
+    nodeStates: {},
     lastEvents: [],
   };
 }
@@ -28,6 +31,7 @@ export function reduce(prev: LiveState, event: BusEvent): LiveState {
     workspaceStates: { ...prev.workspaceStates },
     agentStates: prev.agentStates,
     permissionPending: prev.permissionPending,
+    nodeStates: prev.nodeStates,
     lastEvents: [...prev.lastEvents, event].slice(-MAX_EVENTS),
   };
 
@@ -66,11 +70,53 @@ export function reduce(prev: LiveState, event: BusEvent): LiveState {
         },
       };
     }
+  } else if (event.topic === "workflow") {
+    // The workflow bus event (§4.18): workspace_id scopes the inner
+    // serde-tagged WorkflowEvent (dag.rs). Node states fold into
+    // nodeStates[ws][graph][node]; `loop_back` re-readies its target;
+    // `ack` carries no node and is ignored here.
+    const wid = event.workspace_id;
+    const inner = event.event;
+    if (wid && inner.graph) {
+      const setNode = (node: unknown, state: NodeState): void => {
+        if (typeof node !== "string" || node === "") return;
+        const perGraph = next.nodeStates[wid] ?? {};
+        const perNode = perGraph[inner.graph] ?? {};
+        next.nodeStates = {
+          ...next.nodeStates,
+          [wid]: { ...perGraph, [inner.graph]: { ...perNode, [node]: state } },
+        };
+      };
+      switch (inner.event) {
+        case "node_ready":
+          setNode(inner.node, "ready");
+          break;
+        case "node_started":
+          setNode(inner.node, "running");
+          break;
+        case "node_done":
+          setNode(inner.node, "done");
+          break;
+        case "node_failed":
+          setNode(inner.node, "failed");
+          break;
+        case "node_blocked":
+          setNode(inner.node, "blocked");
+          break;
+        case "node_needs_decision":
+          setNode(inner.node, "needs_decision");
+          break;
+        case "missing_role":
+          setNode(inner.node, "missing_role");
+          break;
+        case "loop_back":
+          setNode(inner.target, "ready");
+          break;
+        default:
+          break;
+      }
+    }
   }
-  // F-8: workflow node states are NOT folded here — the bus events carry no
-  // workspace_id (graph→workspace is ambiguous), and canvases read node
-  // state by polling the workspace-scoped endpoint (documented in the spec).
-  // `loop_back`/`missing_role` events are surfaced via that same polling.
 
   return next;
 }

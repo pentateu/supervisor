@@ -57,7 +57,7 @@ supervisor stop                          # graceful daemon stop
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
-cd web && npm run test && npm run build
+cd web && bun run test && bun run build
 ```
 
 ## Docs

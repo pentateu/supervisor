@@ -8,7 +8,7 @@
 > **System hub:** `docs/specs/2026-08-14-supervisor-webui-detailed-design.md`,
 > `docs/specs/2026-08-13-supervisor-detailed-design.md`
 >
-> Last updated: 2026-08-15.
+> Last updated: 2026-08-16.
 
 ## 0. Locked product decisions (high-level open questions, resolved)
 
@@ -54,8 +54,8 @@ ratatui dashboard.
 
 - **Phase A** — A1 → A2 → A3 → A4 → A5. Gate: `cargo test --workspace` +
   clippy + fmt green, and a live CLI walk of A3–A5 (no browser).
-- **Phase B** — B1 → B2 → B3 → B4 → B5 → B6. Gate: `cd web && npm run test &&`
-  `npm run build` green + manual walk per §11.
+- **Phase B** — B1 → B2 → B3 → B4 → B5 → B6. Gate: `cd web && bun run test &&`
+  `bun run build` green + manual walk per §11.
 
 ## 2. Config
 
@@ -278,6 +278,11 @@ No new `supervisor.toml` keys. No new CLI flags beyond `--action`/`--reason` on
   Rerun / Skip** → `POST …/nodes/{node}/decide` (I-28-style error surfacing
   on failure). Also: a matching action row in triage, and the canvas ! badge
   routes here.
+- **F1 review note (realized):** the "agent is `error`" trigger is realized
+  through the node arm — the engine's default `delegate` on_error policy
+  routes failures to `needs_decision`, and an error-only agent with no
+  `needs_decision` node renders no banner, because the decide endpoint
+  requires a graph+node (409 otherwise).
 
 ### 7.6 Absorbed surfaces (B6)
 
@@ -337,7 +342,7 @@ Phase A, in order, `cargo test --workspace` + clippy + fmt after each:
    `append_decision` record + route + `dag decide` + tests.
 5. A5 triage route + `status` section + tests. Phase A gate: live CLI walk.
 
-Phase B, in order, `cd web && npm run test && npm run build` after each:
+Phase B, in order, `cd web && bun run test && bun run build` after each:
 
 6. B1 types + reducer + tests.
 7. B2 canvas glyphs/edges/tag/idle + poll removal + tests.
@@ -345,11 +350,13 @@ Phase B, in order, `cd web && npm run test && npm run build` after each:
 9. B4 workspace detail page + tests.
 10. B5 activity feed + decide banner + tests.
 11. B6 intake, rules, property panel + tests.
+12. **Phase B complete** — B1–B6 + the review-fix round landed
+    (`6fec772..422d525`); 122 vitest tests + build green.
 
-Then: update the web-UI spec (polling note → SSE; new endpoints in the API
-table; "start new agents" deferral record), the supervisor spec (§13-style
-records for the decide/triage/adopt additions), the polish plan scope trim,
-and `docs/ledger.md`.
+Then: the web-UI spec (SSE note, new endpoints, "start new agents" deferral),
+the supervisor spec (§13-style records for the decide/triage/adopt
+additions), and the polish plan scope trim are done (2026-08-16);
+`docs/ledger.md` is updated by the orchestrator at merge time.
 
 ## 10. Forbidden
 
@@ -370,7 +377,7 @@ and `docs/ledger.md`.
   `supervisor on` twice (one cmux workspace), a timeout parked node →
   `supervisor dag decide … --action rerun` transitions it, `supervisor status`
   shows the triage section, journal lines for the ruling + transitions.
-- Phase B: `npm run test` + `npm run build` green; manual walk: Live tab shows
+- Phase B: `bun run test` + `bun run build` green; manual walk: Live tab shows
   running workspaces with agent rows (canvas only while a workflow runs);
   triage strip lists and links; workspace detail shows filter + cost chart +
   resume; agent dialog shows feed + decide banner; canvas shows glyphs +

@@ -8,8 +8,19 @@ export type AgentState =
   | "waiting_input" | "blocked_permission" | "error";
 export type NodeState =
   | "pending" | "ready" | "running" | "done" | "failed"
-  | "blocked" | "needs_decision";
+  | "blocked" | "needs_decision" | "missing_role";
 export type AgentMode = "foreground" | "background";
+
+/** A4: the three human rulings on a `needs_decision` node. */
+export type DecisionAction = "done" | "rerun" | "skip";
+
+export interface DecisionResponse {
+  node: string;
+  state: string;
+  action: string;
+  workspace: string;
+  graph: string;
+}
 
 export interface Workspace {
   id: string;
@@ -32,6 +43,9 @@ export interface Agent {
   mode: AgentMode;
   state: AgentState;
   confidence: number;
+  // I-21: the daemon injects the per-agent inbox queue depth into the agents
+  // payload (api.rs list_agents).
+  inbox_depth: number;
 }
 
 export interface DoneWhen {
@@ -87,6 +101,28 @@ export interface NodeStateRow {
   started_at: string | null;
   finished_at: string | null;
   error: string | null;
+}
+
+/** A5: `GET /api/v1/triage` — the read-only attention aggregate. The endpoint
+ * is dumb on purpose: sorting and filtering are client-side. */
+export interface TriageAgentRow {
+  ws: string;
+  agent_id: string;
+  state: AgentState;
+  permission_id: string | null;
+}
+
+export interface TriageNodeRow {
+  ws: string;
+  graph_id: string;
+  node_id: string;
+  state: NodeState;
+  error: string | null;
+}
+
+export interface Triage {
+  agents: TriageAgentRow[];
+  nodes: TriageNodeRow[];
 }
 
 export interface UsageRow {
@@ -147,10 +183,49 @@ export interface Proposal {
   resolved_at: string | null;
 }
 
+/** An ingested item (the `intake` table). */
+export interface IntakeItem {
+  id: string;
+  /** `github` | `app-feedback` | `cli`. */
+  source: "github" | "app-feedback" | "cli";
+  /** `bug` | `feature` | `feedback`. */
+  kind: "bug" | "feature" | "feedback";
+  title: string;
+  body: string;
+  severity: string | null;
+  refs: string[];
+  /** The workflow started for this item, once one is. */
+  graph_id: string | null;
+  received_at: string;
+}
+
+/** A stored rule (the `rule` table). */
+export interface StoredRule {
+  id: string;
+  /** The full `[[rule]]` TOML block. */
+  toml: string;
+  /** `data` | `code` | `bakeback`. */
+  source: "data" | "code" | "bakeback";
+  confidence: number;
+  approved: boolean;
+  active: boolean;
+  created_at: string;
+}
+
 // The internal bus event (§4.18). Tagged by `topic`.
 export type BusEvent =
   | { topic: "signal"; signal: string; ws: string; agent: string; [k: string]: unknown }
-  | { topic: "workflow"; event: string; graph: string; node?: string; [k: string]: unknown }
+  | {
+      topic: "workflow";
+      workspace_id: string;
+      // Inner serde object: `tag = "event"`, `rename_all = "snake_case"`
+      // (crates/supervisor-core/src/dag.rs WorkflowEvent): node_ready |
+      // node_started | node_done (+ skipped) | node_failed | node_blocked
+      // (+ reason) | node_needs_decision | missing_role (+ role) | loop_back
+      // (+ target, revision) | ack (+ ack, no node).
+      event: { event: string; graph: string; node?: string; [k: string]: unknown };
+      [k: string]: unknown;
+    }
   | { topic: "fleet"; kind: string; workspace_id?: string; agent_id?: string; [k: string]: unknown }
   | { topic: "decision"; [k: string]: unknown }
   | { topic: "inbox"; kind: string; [k: string]: unknown }

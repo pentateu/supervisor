@@ -955,6 +955,8 @@ POST /api/v1/workspaces/{id}/agents/{aid}/message   { "body": "...", "priority":
 POST /api/v1/workspaces/{id}/agents/{aid}/attach    (spawn a pane on a background agent)
 GET  /api/v1/graphs            GET/PUT/DELETE /api/v1/graphs/{id}
 GET  /api/v1/graphs/{id}/nodes
+GET  /api/v1/triage            (agents + nodes needing attention)
+POST /api/v1/workspaces/{ws}/graphs/{graph}/nodes/{node}/decide   { "action": "done|rerun|skip", "reason": "…" }
 GET  /api/v1/rules             POST /api/v1/rules
 GET  /api/v1/decision-log?since=
 GET  /api/v1/bakeback/proposals            (previewed proposals; status filter)
@@ -1381,6 +1383,32 @@ events; `attach` on a background agent creates a pane bound to its session.
     manager = background decision engine; supervisor agent = human-facing TUI.
 15. One-server-per-project kept; SSE-only idle accepted (mitigated); graceful-off
     safe boundary = end of current turn; bake-back gate `never` initially.
+16. **Decide endpoint + `dag decide` added (I-31 Phase A, A4):** a human ruling
+    on a `needs_decision` node is journaled first as a `DecisionRecord`
+    (`Fleet::append_decision`, signature `human.ruling.<graph>/<node>`) and then
+    executed through `Workflow::ruling()` in the workflow service, applying the
+    returned transitions exactly like the `apply_ack` path (persist, publish,
+    clear running-task bookkeeping). REST:
+    `POST /api/v1/workspaces/{ws}/graphs/{graph}/nodes/{node}/decide`
+    (`{ "action": "done|rerun|skip", "reason": "…" }`; 409 when the node is not
+    in `needs_decision`, 404 unknown ws/graph/node). CLI: `supervisor dag decide
+    <graph> <node> --action … --reason …` — unknown graph/node → exit 2,
+    not-needs-decision → exit 1. The ruling lands in the decision log and feeds
+    bake-back.
+17. **Triage endpoint added (I-31 Phase A, A5):** `GET /api/v1/triage` is a
+    read-only attention aggregate — agents in `waiting_input` /
+    `blocked_permission` / `error` and nodes in `needs_decision` / `failed` /
+    `blocked` / `missing_role` — no journal, no new tables (reuses the
+    `Fleet::agents` / `node_states` iterators, filter in the handler); sorting
+    and filtering are client-side. `supervisor status` prints a triage section
+    from it.
+18. **cmux adopt-or-create in `on()` (I-31 Phase A, A3):** `on()` lists cmux
+    workspaces and matches by the deterministic workspace name — match → adopt
+    (record `cmux_ws` + surfaces as owned handles, no `new_workspace`); no match
+    → create as before. `ensure_panes` still fills any missing foreground panes
+    (adopt + fill), and the resulting `WorkspaceState` is journaled so the
+    adopted workspace survives restart. `off()` closes adopted workspaces like
+    created ones (treated as owned).
 
 ---
 

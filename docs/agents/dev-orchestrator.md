@@ -64,7 +64,7 @@ The repo is a Rust Cargo workspace plus a web UI:
 
 **Verification commands (run before reporting done):**
 `cargo test --workspace` · `cargo clippy --workspace --all-targets -- -D warnings`
-· `cargo fmt --all -- --check` · `cd web && npm run test && npm run build`.
+· `cargo fmt --all -- --check` · `cd web && bun run test && bun run build`.
 
 **Design authority:** `docs/specs/` (date-prefixed specs; the supervisor spec
 is authoritative for the supervisor crates, `2026-08-06-agent-bus-design.md`

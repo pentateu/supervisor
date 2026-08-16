@@ -3,9 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LiveProvider, useLive } from "./store/live-store";
 import { hasToken, onTokenChange } from "./api/client";
 import { Dashboard } from "./pages/Dashboard";
+import { Workspace } from "./pages/Workspace";
 import { AgentDialog } from "./pages/Agent";
 import { Graphs } from "./pages/Graphs";
 import { Decisions } from "./pages/Decisions";
+import { Intake } from "./pages/Intake";
+import { Rules } from "./pages/Rules";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +22,8 @@ function parseRoute(): { page: string; ws?: string; agent?: string; graph?: stri
   if (parts[0] === "graphs" && parts[1]) return { page: "graph", graph: parts[1] };
   if (parts[0] === "graphs") return { page: "graphs" };
   if (parts[0] === "decisions") return { page: "decisions" };
+  if (parts[0] === "intake") return { page: "intake" };
+  if (parts[0] === "rules") return { page: "rules" };
   return { page: "dashboard" };
 }
 
@@ -62,15 +67,19 @@ function Shell() {
           {nav("Dashboard", "dashboard")}
           {nav("Graphs", "graphs")}
           {nav("Decisions", "decisions")}
+          {nav("Intake", "intake")}
+          {nav("Rules", "rules")}
         </nav>
       </header>
       <main>
         {route.page === "dashboard" && <Dashboard />}
-        {route.page === "workspace" && route.ws && <Dashboard ws={route.ws} />}
+        {route.page === "workspace" && route.ws && <Workspace ws={route.ws} />}
         {route.page === "agent" && route.ws && route.agent && <AgentDialog ws={route.ws} agent={route.agent} />}
         {route.page === "graphs" && <Graphs />}
         {route.page === "graph" && route.graph && <Graphs id={route.graph} />}
         {route.page === "decisions" && <Decisions />}
+        {route.page === "intake" && <Intake />}
+        {route.page === "rules" && <Rules />}
       </main>
     </div>
   );

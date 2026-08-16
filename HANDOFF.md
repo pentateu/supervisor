@@ -53,7 +53,7 @@ web/                   # the web UI (Vite + React + TS): live dashboard, workflo
 
 ## Next: I-31 Phase B (the web UI) — `docs/plans/plan_2026-08_supervisor-webui-i31.md` §9
 
-Follow §9 in order, `cd web && npm run test && npm run build` after each:
+Follow §9 in order, `cd web && bun run test && bun run build` after each:
 
 1. **B1** types + reducer: `NodeState` += `"missing_role"`; the workflow arm reads the nested `event`; key node states under `nodeStates[workspace_id][graph][node]` (the synthetic `""` fallback was deleted).
 2. **B2** canvas: state glyphs (✓✕⛔!⚠, never color-only), `loop_back` dashed edges, `on_error` tags, `idle` prop; **remove the 2s node-state polls** — initial state loads once from `GET /graphs/{id}/nodes?ws=`, updates via SSE (the reducer is the single authority).
@@ -69,7 +69,7 @@ Follow §9 in order, `cd web && npm run test && npm run build` after each:
 - **Worktrees share one cargo `target/`.** Dev work happens in `.worktrees/feature/<topic>/`; the `post-checkout` hook in `.git/hooks/` auto-symlinks the worktree's `target` → the repo root's `target/`. Never create a real `target/` inside a worktree. Manual equivalent: `ln -s /Users/rafael/Development/supervisor/target .worktrees/feature/<topic>/target`. (This is the AI_Tutor convention.)
 - **Cleanup step when finishing a feature:** `cargo sweep --stamp && cargo sweep --file` on the main repo target, then `git worktree remove .worktrees/feature/<topic>` and `git branch -d feature/<topic>` + `git worktree prune`.
 - **Worktree start:** `git fetch origin && git worktree add .worktrees/feature/<topic> -b feature/<topic> origin/main`.
-- **Verification:** `cargo test --workspace` · `cargo clippy --workspace --all-targets -- -D warnings` · `cargo fmt --all -- --check` · `cd web && npm run test && npm run build`.
+- **Verification:** `cargo test --workspace` · `cargo clippy --workspace --all-targets -- -D warnings` · `cargo fmt --all -- --check` · `cd web && bun run test && bun run build`.
 - **Ledger + docs lifecycle:** one ledger row per plan; update at every transition; broadcast doc changes on the bus per `docs/agents/memory-keeper.md` (plans → `agent_bus/dev`).
 - **Review loop:** milestones go to `agent_bus/review` (post with `--from dev`), fixes from findings, re-request until APPROVE.
 

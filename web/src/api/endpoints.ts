@@ -4,13 +4,18 @@
 import { get, post, put } from "./client";
 import type {
   Agent,
+  DecisionAction,
   DecisionRecord,
+  DecisionResponse,
   GraphDef,
   GraphRecord,
+  IntakeItem,
   Metrics,
   NodeStateRow,
   Proposal,
+  StoredRule,
   TranscriptMessage,
+  Triage,
   UsageRow,
   Workspace,
 } from "./types";
@@ -21,6 +26,7 @@ export const api = {
   workspaces: () => get<Workspace[]>("/api/v1/workspaces"),
   workspace: (ws: string) => get<Workspace>(`/api/v1/workspaces/${encodeURIComponent(ws)}`),
   agents: (ws: string) => get<Agent[]>(`/api/v1/workspaces/${encodeURIComponent(ws)}/agents`),
+  triage: () => get<Triage>("/api/v1/triage"),
 
   workspaceOn: (ws: string) => post<{ workspace: string; state: string }>(`/api/v1/workspaces/${encodeURIComponent(ws)}/on`),
   workspaceOff: (ws: string, graceful = true) =>
@@ -47,6 +53,11 @@ export const api = {
   saveGraph: (id: string, data: string) => put(`/api/v1/graphs/${encodeURIComponent(id)}`, { data }),
   startGraph: (ws: string, graph: string, vars: Record<string, string> = {}) =>
     post(`/api/v1/workspaces/${encodeURIComponent(ws)}/graphs/${encodeURIComponent(graph)}/start`, { vars }),
+  decide: (ws: string, graph: string, node: string, action: DecisionAction, reason?: string) =>
+    post<DecisionResponse>(
+      `/api/v1/workspaces/${encodeURIComponent(ws)}/graphs/${encodeURIComponent(graph)}/nodes/${encodeURIComponent(node)}/decide`,
+      reason ? { action, reason } : { action },
+    ),
 
   usage: (params: { ws?: string; agent?: string; since?: string } = {}) => {
     const q = new URLSearchParams();
@@ -65,6 +76,11 @@ export const api = {
   previewBakeback: () => post<{ created: Proposal[]; pending: Proposal[] }>("/api/v1/bakeback/preview"),
   applyProposal: (id: string) => post(`/api/v1/bakeback/proposals/${encodeURIComponent(id)}/apply`),
   rejectProposal: (id: string) => post(`/api/v1/bakeback/proposals/${encodeURIComponent(id)}/reject`),
+
+  intake: () => get<IntakeItem[]>("/api/v1/intake"),
+  rules: () => get<StoredRule[]>("/api/v1/rules"),
+  addRule: (toml: string) => post<{ rule: string; added: boolean }>("/api/v1/rules", { toml }),
+  reloadRules: () => post<{ reloaded: boolean }>("/api/v1/rules/reload"),
 };
 
 /** Parse a stored graph JSON into a GraphDef (handles missing fields and

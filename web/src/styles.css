@@ -69,6 +69,100 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .metric-value { font-size: 18px; font-weight: 700; }
 
 .ws-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+
+/* --- Dashboard tab shell (B3) --- */
+.dash-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.dash-tabs { display: flex; gap: 6px; }
+.dash-tab {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+}
+.dash-tab:hover { background: #21262d; }
+.dash-tab.active { color: var(--text); background: #21262d; border-color: var(--blue); }
+.tab-badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: #0f1117;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* --- Triage strip (B3): pinned above the workspace cards --- */
+.triage-strip {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.triage-empty { margin: 0 0 16px; }
+.triage-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 6px; color: var(--text); }
+.triage-row:hover { background: #21262d; }
+.triage-glyph { width: 20px; text-align: center; font-size: 13px; }
+.triage-label { font-weight: 600; }
+.triage-ws { margin-left: auto; }
+
+/* --- Workspace card agent rows (B3) --- */
+.ws-filter { display: flex; gap: 6px; margin: 8px 0 2px; }
+.ws-filter button {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 12px;
+}
+.ws-filter button.active { color: var(--text); background: #21262d; border-color: var(--blue); }
+.ws-agent-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.ws-agent-state { font-size: 11px; color: var(--dim); min-width: 90px; }
+.ws-agent-depth { margin-left: auto; font-size: 12px; }
+.ws-agent-action { font-size: 12px; padding: 2px 8px; }
+.ws-start { display: flex; gap: 8px; margin: 10px 0 2px; align-items: center; }
+.ws-start select { width: auto; flex: 1; }
+
+/* --- Off workspaces (B3) --- */
+.off-workspaces {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 8px 12px;
+}
+.off-workspaces summary { cursor: pointer; color: var(--dim); font-weight: 600; }
+.off-ws { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.off-ws:last-child { border-bottom: none; }
+
+/* --- Stats tab (B3) --- */
+.stats-table { width: 100%; border-collapse: collapse; margin: 6px 0 16px; }
+.stats-table th, .stats-table td { text-align: left; padding: 4px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.stats-table th { color: var(--dim); text-transform: uppercase; font-size: 11px; }
+.stats-shortcuts { display: flex; gap: 14px; margin-top: 4px; flex-wrap: wrap; }
+.time-series {
+  width: 100%;
+  height: 120px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 6px 0 16px;
+}
+.ts-bar { fill: var(--blue); }
+.ts-axis { stroke: var(--border); }
+.ts-label { fill: var(--dim); font-size: 9px; }
 .ws-card {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -118,7 +212,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .react-flow__controls-button:hover { background: #30363d; }
 
 /* --- WorkflowCanvas node card --- */
-.wf-canvas { height: 520px; }
+.wf-canvas { height: 520px; position: relative; }
 .wf-canvas.wf-compact { height: 260px; }
 .wf-node {
   background: var(--panel);
@@ -132,18 +226,76 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .wf-glyph { float: left; margin-right: 6px; }
 .wf-id { font-weight: 600; }
 .wf-meta { color: var(--dim); font-size: 11px; }
-.wf-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; }
-.wf-agent-working, .wf-agent-spawning { background: var(--blue); animation: pulse 1.2s infinite; }
-.wf-agent-idle { background: var(--dim); }
-.wf-agent-waiting_input, .wf-agent-blocked_permission { background: var(--amber); }
-.wf-agent-error { background: var(--red); }
+
+/* §6.2 state glyphs: the state is never color-only — each glyph carries the
+   state name in its aria-label. */
+.wf-state-glyph { margin-left: 2px; font-size: 13px; }
+.wf-done .wf-state-glyph { color: var(--green); }
+.wf-failed .wf-state-glyph { color: var(--red); }
+.wf-blocked .wf-state-glyph, .wf-needs_decision .wf-state-glyph { color: var(--amber); }
+/* I3-review minor: --pending (#6e7681) fails 4.5:1 on the card; --dim
+   (#8b91a0) is ≈5.5:1 on --panel and keeps the muted missing_role tone. */
+.wf-missing_role .wf-state-glyph { color: var(--dim); }
+.wf-ready .wf-state-glyph { color: var(--blue); animation: pulse 2s infinite; }
+.wf-needs_decision .wf-state-glyph { animation: pulse 2.4s infinite; }
+
+/* §6.2 agent-state overlay (card corner): working = spinner, waiting/blocked
+   = highlight, idle = dim. */
+.wf-agent-state {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.wf-agent-state.wf-agent-working {
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--blue);
+  animation: spin 0.8s linear infinite;
+}
+.wf-agent-state.wf-agent-spawning { background: var(--blue); animation: pulse 1.2s infinite; }
+.wf-agent-state.wf-agent-idle { background: var(--dim); }
+.wf-agent-state.wf-agent-waiting_input, .wf-agent-state.wf-agent-blocked_permission {
+  background: var(--amber);
+  animation: pulse 1.6s infinite;
+}
+.wf-agent-state.wf-agent-error { background: var(--red); }
+
+.wf-on-error {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--dim);
+}
+
+/* B2 idle prop: last-run states at low emphasis, no spinner, caption. */
+.wf-node.wf-idle { opacity: 0.75; }
+.wf-node.wf-idle .wf-spinner, .wf-node.wf-idle .wf-agent-state { display: none; }
+.wf-idle-caption {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 5;
+  pointer-events: none;
+  font-size: 11px;
+  color: var(--dim);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
 
 .wf-pending { border-color: var(--pending); color: var(--dim); }
-.wf-ready { border-color: var(--blue); }
-.wf-running { border-color: var(--blue); background: #1a2b45; }
+.wf-ready { border-color: var(--blue); animation: readyPulse 2s ease-in-out infinite; }
+.wf-running { border-color: var(--blue); background: #1a2b45; animation: runningGlow 1.6s ease-in-out infinite; }
 .wf-done { border-color: var(--green); }
 .wf-failed { border-color: var(--red); }
 .wf-blocked, .wf-needs_decision { border-color: var(--amber); }
+.wf-missing_role { border-color: var(--pending); }
 .wf-missing { border-style: dashed; }
 
 .wf-spinner {
@@ -159,6 +311,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 50% { opacity: 0.4; } }
+@keyframes readyPulse { 50% { border-color: rgba(56, 139, 253, 0.35); } }
+@keyframes runningGlow {
+  50% { box-shadow: 0 0 10px rgba(56, 139, 253, 0.35); }
+}
 
 .wf-agent-chip {
   display: inline-block;
@@ -174,6 +330,24 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .wf-agent-chip.wf-agent-error { border-color: var(--red); color: var(--red); }
 
 /* --- Agent dialog --- */
+/* B5: §5.4 activity feed — horizontal timeline ticks above the transcript. */
+.agent-feed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0d1117;
+}
+.feed-tick { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.feed-time { color: var(--dim); font-size: 11px; }
+/* M12 follow-up: the expand toggle lives outside .agent-feed (outside the
+   aria-live log) — keep it aligned with the feed strip's 8px content inset
+   and the strip's own bottom gap. */
+.feed-more { font-size: 11px; padding: 1px 8px; margin: 0 0 8px 8px; }
 .agent-page .transcript {
   height: 420px;
   overflow-y: auto;
@@ -214,6 +388,12 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .properties label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--dim); }
 .graph-live { border: 1px solid var(--border); border-radius: 8px; height: 360px; margin-bottom: 16px; }
 .graph-list li { margin: 4px 0; }
-.decision, .proposal { border-bottom: 1px solid var(--border); padding: 6px 0; }
+.decision, .proposal, .intake-row, .rule { border-bottom: 1px solid var(--border); padding: 6px 0; }
+.note { color: var(--green); font-size: 12px; }
+.rule .on { color: var(--green); }
+.rule .off { color: var(--dim); }
+.intake-row .bug { color: var(--red); }
+.intake-row .feature { color: var(--blue); }
+.intake-row .feedback { color: var(--dim); }
 
 .missing-token { max-width: 520px; margin: 80px auto; text-align: center; }
