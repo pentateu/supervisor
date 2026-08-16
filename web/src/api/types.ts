@@ -11,6 +11,17 @@ export type NodeState =
   | "blocked" | "needs_decision" | "missing_role";
 export type AgentMode = "foreground" | "background";
 
+/** A4: the three human rulings on a `needs_decision` node. */
+export type DecisionAction = "done" | "rerun" | "skip";
+
+export interface DecisionResponse {
+  node: string;
+  state: string;
+  action: string;
+  workspace: string;
+  graph: string;
+}
+
 export interface Workspace {
   id: string;
   path: string;

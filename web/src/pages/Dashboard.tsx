@@ -152,24 +152,57 @@ export function buildTriage(rest: Triage, live: LiveState): TriageRow[] {
   return result;
 }
 
-/** The pinned attention strip: glyph + label + ws per row; agent rows open the
- * agent dialog, node rows the graph. */
+/** §7.5 triage row targets: agent rows (and needs_decision node rows whose
+ * node resolves to an agent) open the agent dialog; other node rows the
+ * graph. Ownership: node.agent_id, else node.role matched against the
+ * workspace's agents (api.graphs + api.agents). */
+export function resolveTriageHref(r: TriageRow, graphs: GraphRecord[], agents: Agent[]): string {
+  if (r.kind === "agent") return `#/workspaces/${r.ws}/agents/${r.agent_id}`;
+  if (r.state === "needs_decision") {
+    const node = graphs
+      .map((g) => parseGraph(g.data))
+      .find((g) => g.id === r.graph_id)
+      ?.nodes.find((n) => n.id === r.node_id);
+    if (node) {
+      const aid = node.agent_id ?? agents.find((a) => a.role === node.role)?.agent_id;
+      if (aid) return `#/workspaces/${r.ws}/agents/${aid}`;
+    }
+  }
+  return `#/graphs/${r.graph_id}`;
+}
+
+function TriageRowLink({ r }: { r: TriageRow }) {
+  const { data: graphs } = useQuery({
+    queryKey: ["graphs"],
+    queryFn: api.graphs,
+    enabled: r.kind === "node" && r.state === "needs_decision",
+  });
+  const { data: agents } = useQuery({
+    queryKey: ["agents", r.ws],
+    queryFn: () => api.agents(r.ws),
+    enabled: r.kind === "node" && r.state === "needs_decision",
+  });
+  const href = resolveTriageHref(r, graphs ?? [], agents ?? []);
+  return (
+    <a className="triage-row" href={href}>
+      <span className="triage-glyph" role="img" aria-label={r.state}>
+        {TRIAGE_GLYPH[r.state] ?? "•"}
+      </span>
+      <span className="triage-label">{rowLabel(r)}</span>
+      <span className="triage-ws dim">{r.ws}</span>
+    </a>
+  );
+}
+
+/** The pinned attention strip: glyph + label + ws per row; agent rows and
+ * needs_decision node rows with an agent open the agent dialog, other node
+ * rows the graph (§7.5). */
 function TriageStrip({ rows }: { rows: TriageRow[] }) {
   if (rows.length === 0) return <p className="triage-empty dim">nothing needs attention</p>;
   return (
     <section className="triage-strip" aria-label="triage">
       {rows.map((r) => (
-        <a
-          key={rowKey(r)}
-          className="triage-row"
-          href={r.kind === "agent" ? `#/workspaces/${r.ws}/agents/${r.agent_id}` : `#/graphs/${r.graph_id}`}
-        >
-          <span className="triage-glyph" role="img" aria-label={r.state}>
-            {TRIAGE_GLYPH[r.state] ?? "•"}
-          </span>
-          <span className="triage-label">{rowLabel(r)}</span>
-          <span className="triage-ws dim">{r.ws}</span>
-        </a>
+        <TriageRowLink key={rowKey(r)} r={r} />
       ))}
     </section>
   );

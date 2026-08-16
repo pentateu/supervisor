@@ -328,6 +328,21 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .wf-agent-chip.wf-agent-error { border-color: var(--red); color: var(--red); }
 
 /* --- Agent dialog --- */
+/* B5: §5.4 activity feed — horizontal timeline ticks above the transcript. */
+.agent-feed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0d1117;
+}
+.feed-tick { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+.feed-time { color: var(--dim); font-size: 11px; }
+.feed-more { font-size: 11px; padding: 1px 8px; }
 .agent-page .transcript {
   height: 420px;
   overflow-y: auto;

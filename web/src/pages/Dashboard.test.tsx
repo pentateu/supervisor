@@ -219,6 +219,73 @@ describe("triage strip", () => {
     expect(within(strip).getByRole("link", { name: /g\/fix/ })).toHaveAttribute("href", "#/graphs/g");
   });
 
+  it("links needs_decision node rows to the agent dialog when the node owns an agent by role", async () => {
+    await renderDashboard({
+      triage: {
+        agents: [],
+        nodes: [{ ws: "iot", graph_id: "bug_flow", node_id: "fix", state: "needs_decision", error: null }],
+      },
+      agents: [DEV],
+      graphs: [GRAPH_ACTIVE],
+    });
+    const strip = await screen.findByLabelText("triage");
+    await waitFor(() =>
+      expect(within(strip).getByRole("link", { name: /bug_flow\/fix/ })).toHaveAttribute(
+        "href",
+        "#/workspaces/iot/agents/dev_01",
+      ),
+    );
+  });
+
+  it("links needs_decision node rows to the agent dialog by explicit agent_id", async () => {
+    const byAgent = JSON.stringify({
+      id: "bug_flow",
+      name: "bug flow",
+      nodes: [
+        { id: "fix", role: "dev", agent_id: "rev_01", depends_on: [], start_template: "fix it", done_when: { ack: "fix" }, on_error: "delegate", mode: "foreground" },
+      ],
+    });
+    await renderDashboard({
+      triage: {
+        agents: [],
+        nodes: [{ ws: "iot", graph_id: "bug_flow", node_id: "fix", state: "needs_decision", error: null }],
+      },
+      graphs: [{ ...GRAPH_ACTIVE, data: byAgent }],
+    });
+    const strip = await screen.findByLabelText("triage");
+    await waitFor(() =>
+      expect(within(strip).getByRole("link", { name: /bug_flow\/fix/ })).toHaveAttribute(
+        "href",
+        "#/workspaces/iot/agents/rev_01",
+      ),
+    );
+  });
+
+  it("keeps the graph link when a needs_decision node has no resolvable agent", async () => {
+    await renderDashboard({
+      triage: {
+        agents: [],
+        nodes: [{ ws: "iot", graph_id: "bug_flow", node_id: "fix", state: "needs_decision", error: null }],
+      },
+      agents: [DEV],
+    });
+    const strip = await screen.findByLabelText("triage");
+    expect(within(strip).getByRole("link", { name: /bug_flow\/fix/ })).toHaveAttribute("href", "#/graphs/bug_flow");
+  });
+
+  it("keeps the graph link for other node states even when an agent resolves", async () => {
+    await renderDashboard({
+      triage: {
+        agents: [],
+        nodes: [{ ws: "iot", graph_id: "bug_flow", node_id: "fix", state: "failed", error: null }],
+      },
+      agents: [DEV],
+      graphs: [GRAPH_ACTIVE],
+    });
+    const strip = await screen.findByLabelText("triage");
+    expect(within(strip).getByRole("link", { name: /bug_flow\/fix/ })).toHaveAttribute("href", "#/graphs/bug_flow");
+  });
+
   it("shows the empty state when nothing needs attention", async () => {
     await renderDashboard({ triage: { agents: [], nodes: [] } });
     expect(await screen.findByText("nothing needs attention")).toBeInTheDocument();

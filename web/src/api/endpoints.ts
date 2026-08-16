@@ -4,7 +4,9 @@
 import { get, post, put } from "./client";
 import type {
   Agent,
+  DecisionAction,
   DecisionRecord,
+  DecisionResponse,
   GraphDef,
   GraphRecord,
   Metrics,
@@ -49,6 +51,11 @@ export const api = {
   saveGraph: (id: string, data: string) => put(`/api/v1/graphs/${encodeURIComponent(id)}`, { data }),
   startGraph: (ws: string, graph: string, vars: Record<string, string> = {}) =>
     post(`/api/v1/workspaces/${encodeURIComponent(ws)}/graphs/${encodeURIComponent(graph)}/start`, { vars }),
+  decide: (ws: string, graph: string, node: string, action: DecisionAction, reason?: string) =>
+    post<DecisionResponse>(
+      `/api/v1/workspaces/${encodeURIComponent(ws)}/graphs/${encodeURIComponent(graph)}/nodes/${encodeURIComponent(node)}/decide`,
+      reason ? { action, reason } : { action },
+    ),
 
   usage: (params: { ws?: string; agent?: string; since?: string } = {}) => {
     const q = new URLSearchParams();
