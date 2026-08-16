@@ -409,6 +409,21 @@ describe("workspace cards", () => {
     fireEvent.click(screen.getByRole("button", { name: "start" }));
     await waitFor(() => expect(api.startGraph).toHaveBeenCalledWith("iot", "other_flow"));
   });
+
+  it("counts error agents from the live store in the card badge — live wins over REST (I3 review minor)", async () => {
+    mockLive.live = { ...mockLive.live, agentStates: { iot: { dev_01: "error" } } };
+    await renderDashboard({ workspaces: [WS_ON], agents: [{ ...DEV, state: "idle" }] });
+    expect(await screen.findByText("⚠ 1 awaiting input/approval")).toBeInTheDocument();
+  });
+
+  it("falls back to REST states for the badge and drops agents that recovered over SSE", async () => {
+    mockLive.live = { ...mockLive.live, agentStates: { iot: { dev_01: "idle" } } };
+    await renderDashboard({
+      workspaces: [WS_ON],
+      agents: [{ ...DEV, state: "waiting_input" }, { ...REVIEWER, state: "blocked_permission" }],
+    });
+    expect(await screen.findByText("⚠ 1 awaiting input/approval")).toBeInTheDocument();
+  });
 });
 
 describe("off workspaces", () => {
@@ -434,11 +449,13 @@ describe("off workspaces", () => {
 });
 
 describe("Stats tab", () => {
+  // I3: the fixture mirrors the daemon wire exactly (api.rs): per_workspace
+  // rows carry ONLY {decisions, tokens, cost_cents}; per_agent is always {}.
   const METRICS: Metrics = {
     since: "2026-08-16T00:00:00Z",
     totals: { messages_delivered: 42, errors: 1, decisions: 3, nodes_done: 9, nodes_failed: 1, tokens: 1200, cost_cents: 123 },
-    per_workspace: { iot: { messages_delivered: 42, errors: 1, decisions: 3, nodes_done: 9, cost_cents: 123 } },
-    per_agent: { "iot/dev_01": { messages_delivered: 40, errors: 0, decisions: 2, nodes_done: 7, cost_cents: 100 } },
+    per_workspace: { iot: { decisions: 3, tokens: 1200, cost_cents: 123 } },
+    per_agent: {},
     time_series: [
       { ts: "2026-08-16T01:00:00Z", messages: 10, errors: 0, cost_cents: null },
       { ts: "2026-08-16T02:00:00Z", messages: 20, errors: 1, cost_cents: 60 },
@@ -453,10 +470,26 @@ describe("Stats tab", () => {
     expect(chart.querySelectorAll(".ts-bar")).toHaveLength(2);
     expect(screen.getByText("per workspace")).toBeInTheDocument();
     expect(screen.getByText("per agent")).toBeInTheDocument();
-    expect(screen.getByText("iot/dev_01")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Graphs" })).toHaveAttribute("href", "#/graphs");
     expect(screen.getByRole("link", { name: "Rules" })).toHaveAttribute("href", "#/rules");
     expect(screen.getByRole("link", { name: "Decisions" })).toHaveAttribute("href", "#/decisions");
     expect(screen.getByRole("link", { name: "Intake" })).toHaveAttribute("href", "#/intake");
+  });
+
+  it("renders only the wire's per-workspace columns — decisions, tokens, cost (I3)", async () => {
+    await renderDashboard({ workspaces: [WS_ON], metrics: METRICS });
+    fireEvent.click(screen.getByRole("tab", { name: /stats/i }));
+    const table = await screen.findByRole("table");
+    const headers = [...table.querySelectorAll("th")].map((th) => th.textContent);
+    expect(headers).toEqual(["id", "decisions", "tokens", "cost"]);
+    expect(within(table).getByText("iot")).toBeInTheDocument();
+  });
+
+  it("renders the per-agent empty state — the daemon always sends per_agent {} (I3)", async () => {
+    await renderDashboard({ workspaces: [WS_ON], metrics: METRICS });
+    fireEvent.click(screen.getByRole("tab", { name: /stats/i }));
+    expect(await screen.findByText("per agent")).toBeInTheDocument();
+    expect(await screen.findByText("no data yet")).toBeInTheDocument();
+    expect(screen.getAllByRole("table")).toHaveLength(1);
   });
 });

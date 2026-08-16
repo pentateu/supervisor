@@ -185,6 +185,16 @@ describe("editor property panel", () => {
     expect(graph.nodes[0].loop_back).toBeNull();
   });
 
+  it("shows the clear affordance for a partially-filled loop_back and nulls it (I3 review minor)", async () => {
+    const { container } = await renderEditor();
+    selectNode(container);
+    change("loop_back.small", "fix");
+    expect(screen.getByRole("button", { name: "clear loop_back" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "clear loop_back" }));
+    const graph = await save();
+    expect(graph.nodes[0].loop_back).toBeNull();
+  });
+
   it("edits mode and timeout_secs, nulling timeout when cleared", async () => {
     const { container } = await renderEditor();
     selectNode(container);

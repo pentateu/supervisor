@@ -38,8 +38,10 @@ function Editor({ graph }: { graph: GraphDef }) {
   // loop_back keeps its `on` key only while it has a value: an empty on must
   // not serialize (`LoopBack.on` is optional on the wire, §4.11).
   const loopBack: LoopBack = selectedNode?.loop_back ?? { small: "", big: "" };
-  const loopBackEmpty = !(loopBack.on || loopBack.small || loopBack.big);
-  const canClearLoopBack = selectedNode?.loop_back != null && loopBackEmpty;
+  // I3-review minor: the clear affordance appears whenever the node HAS a
+  // loop_back object — a partially-filled one must be clearable too — and
+  // clearing nulls it.
+  const canClearLoopBack = selectedNode?.loop_back != null;
   const patchLoopBack = (next: LoopBack) => {
     const { on, ...rest } = next;
     patch({ loop_back: on ? { ...rest, on } : rest });

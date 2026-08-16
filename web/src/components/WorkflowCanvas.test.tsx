@@ -100,6 +100,38 @@ describe("WorkflowCanvas state glyphs", () => {
   });
 });
 
+describe("WorkflowCanvas motion cues (I3 review minor)", () => {
+  const AGENTED: GraphDef = {
+    id: "ag",
+    name: "ag",
+    nodes: [
+      {
+        id: "a1",
+        role: "dev",
+        agent_id: "dev_01",
+        depends_on: [],
+        start_template: "do it",
+        done_when: { ack: "a1" },
+        on_error: "delegate",
+        mode: "foreground",
+      },
+    ],
+  };
+
+  it("labels the running spinner and the agent-state dot with accessible names", async () => {
+    await renderCanvas(
+      <WorkflowCanvas
+        graph={AGENTED}
+        mode="live"
+        nodeStates={{ a1: "running" }}
+        agentStates={{ dev_01: "working" }}
+      />,
+    );
+    expect(screen.getByRole("img", { name: "running" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "agent working" })).toBeInTheDocument();
+  });
+});
+
 describe("WorkflowCanvas on_error tag", () => {
   it("renders delegate, skip, and rerun ×N chips", async () => {
     await renderCanvas(<WorkflowCanvas graph={GRAPH} mode="live" />);

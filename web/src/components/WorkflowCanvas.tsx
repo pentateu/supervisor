@@ -108,9 +108,14 @@ function StateCard({ data }: NodeProps<Node<CardData>>) {
         {d.agent ?? (missing ? "no agent" : "—")}
         {onError && <span className="wf-on-error">{onError}</span>}
       </div>
-      {!d.idle && d.state === "running" && <div className="wf-spinner" />}
+      {!d.idle && d.state === "running" && <div className="wf-spinner" role="img" aria-label="running" />}
       {!d.idle && d.agentState && (
-        <span className={`wf-agent-state wf-agent-${d.agentState}`} title={d.agentState} />
+        <span
+          className={`wf-agent-state wf-agent-${d.agentState}`}
+          role="img"
+          aria-label={`agent ${d.agentState}`}
+          title={d.agentState}
+        />
       )}
       <Handle type="source" position={Position.Bottom} />
     </div>
@@ -253,7 +258,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     onChange(next);
   };
   const handleNodeClick = (_: unknown, n: Node<CardData>) => {
-    onNodeClick?.(graph.nodes.find((g) => g.id === n.id)!, n.data.agent);
+    const node = graph.nodes.find((g) => g.id === n.id);
+    if (node) onNodeClick?.(node, n.data.agent);
   };
 
   return (

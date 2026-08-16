@@ -266,7 +266,10 @@ function WorkspaceCard({ ws, restState }: { ws: string; restState: WorkspaceStat
   // authority); the snapshot is only the boot-time fallback.
   const state = live.workspaceStates[ws] ?? restState;
   const shown = agentList.filter((a) => filter === "all" || a.mode === filter);
-  const triage = agentList.filter((a) => a.state === "waiting_input" || a.state === "blocked_permission");
+  // I3-review minor: the card badge counts the same states as the triage
+  // strip — the live store wins (no up-to-3s REST lag), the REST snapshot is
+  // the boot fallback, and `error` agents count like they do in the strip.
+  const triage = agentList.filter((a) => TRIAGE_AGENT_STATES.has(live.agentStates[ws]?.[a.agent_id] ?? a.state));
 
   // I-28: lifecycle mutations must surface failures, not vanish.
   const toggle = async (next: "on" | "off") => {
@@ -474,6 +477,9 @@ function cost(cents: number | null | undefined): string {
   return cents != null ? `$${(cents / 100).toFixed(2)}` : "—";
 }
 
+// I3: the daemon's metrics wire (api.rs) sends per_workspace rows with only
+// {decisions, tokens, cost_cents} and per_agent {} always — render exactly
+// those columns, no always-dead ones.
 function MetricsTable({ rows }: { rows: Array<[string, Partial<MetricsTotals>]> }) {
   if (rows.length === 0) return <p className="dim">no data yet</p>;
   return (
@@ -481,10 +487,8 @@ function MetricsTable({ rows }: { rows: Array<[string, Partial<MetricsTotals>]> 
       <thead>
         <tr>
           <th>id</th>
-          <th>messages</th>
-          <th>errors</th>
           <th>decisions</th>
-          <th>nodes done</th>
+          <th>tokens</th>
           <th>cost</th>
         </tr>
       </thead>
@@ -492,10 +496,8 @@ function MetricsTable({ rows }: { rows: Array<[string, Partial<MetricsTotals>]> 
         {rows.map(([id, m]) => (
           <tr key={id}>
             <td>{id}</td>
-            <td>{m.messages_delivered ?? "—"}</td>
-            <td>{m.errors ?? "—"}</td>
             <td>{m.decisions ?? "—"}</td>
-            <td>{m.nodes_done ?? "—"}</td>
+            <td>{m.tokens ?? "—"}</td>
             <td>{cost(m.cost_cents)}</td>
           </tr>
         ))}

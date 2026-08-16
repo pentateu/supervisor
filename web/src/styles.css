@@ -233,7 +233,9 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .wf-done .wf-state-glyph { color: var(--green); }
 .wf-failed .wf-state-glyph { color: var(--red); }
 .wf-blocked .wf-state-glyph, .wf-needs_decision .wf-state-glyph { color: var(--amber); }
-.wf-missing_role .wf-state-glyph { color: var(--pending); }
+/* I3-review minor: --pending (#6e7681) fails 4.5:1 on the card; --dim
+   (#8b91a0) is ≈5.5:1 on --panel and keeps the muted missing_role tone. */
+.wf-missing_role .wf-state-glyph { color: var(--dim); }
 .wf-ready .wf-state-glyph { color: var(--blue); animation: pulse 2s infinite; }
 .wf-needs_decision .wf-state-glyph { animation: pulse 2.4s infinite; }
 
@@ -342,7 +344,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 }
 .feed-tick { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .feed-time { color: var(--dim); font-size: 11px; }
-.feed-more { font-size: 11px; padding: 1px 8px; }
+/* M12 follow-up: the expand toggle lives outside .agent-feed (outside the
+   aria-live log) — keep it aligned with the feed strip's 8px content inset
+   and the strip's own bottom gap. */
+.feed-more { font-size: 11px; padding: 1px 8px; margin: 0 0 8px 8px; }
 .agent-page .transcript {
   height: 420px;
   overflow-y: auto;
